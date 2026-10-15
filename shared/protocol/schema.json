@@ -1,0 +1,170 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SkyfighterProtocol",
+  "description": "Formal protocol schemas for SKYFIGHTER UAV Ground Control Station and Gateway communication (v1.1)",
+  "definitions": {
+    "TelemetryPacket": {
+      "type": "object",
+      "required": ["version", "type", "timestamp_ms", "flight", "sensors", "gps", "battery", "alerts"],
+      "properties": {
+        "version": { "type": "integer", "enum": [1] },
+        "type": { "type": "string", "enum": ["telemetry"] },
+        "timestamp_ms": { "type": "integer", "minimum": 0 },
+        "sequence": { "type": "integer", "minimum": 0 },
+        "connection": { "type": ["string", "null"] },
+        "flight": {
+          "type": "object",
+          "required": ["mode", "armed", "capabilities"],
+          "properties": {
+            "mode": { "type": "string", "enum": ["disarmed", "manual", "autonomous", "failsafe", "unknown"] },
+            "armed": { "type": "boolean" },
+            "capabilities": {
+              "type": "object",
+              "required": ["manual_control", "autonomous_navigation", "return_to_home"],
+              "properties": {
+                "manual_control": { "type": "boolean" },
+                "autonomous_navigation": { "type": "boolean" },
+                "return_to_home": { "type": "boolean" },
+                "thermal_camera": { "type": "boolean" },
+                "rgb_camera": { "type": "boolean" },
+                "buzzer": { "type": "boolean" },
+                "simulation_mode": { "type": "boolean" }
+              }
+            }
+          }
+        },
+        "sensors": {
+          "type": "object",
+          "properties": {
+            "temperature_c": { "type": ["number", "null"] },
+            "humidity_pct": { "type": ["number", "null"] },
+            "mq2_adc": { "type": ["integer", "null"] },
+            "flame_detected": { "type": ["boolean", "null"] },
+            "mpu_connected": { "type": ["boolean", "null"] },
+            "mpu_temperature_c": { "type": ["number", "null"] }
+          }
+        },
+        "gps": {
+          "type": "object",
+          "required": ["valid"],
+          "properties": {
+            "valid": { "type": "boolean" },
+            "latitude": { "type": ["number", "null"], "minimum": -90.0, "maximum": 90.0 },
+            "longitude": { "type": ["number", "null"], "minimum": -180.0, "maximum": 180.0 },
+            "satellites": { "type": ["integer", "null"], "minimum": 0 },
+            "altitude_m": { "type": ["number", "null"] }
+          }
+        },
+        "battery": {
+          "type": "object",
+          "properties": {
+            "voltage_v": { "type": ["number", "null"] },
+            "percentage": { "type": ["integer", "null"], "minimum": 0, "maximum": 100 }
+          }
+        },
+        "alerts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["code", "severity", "source", "message", "timestamp_ms"],
+            "properties": {
+              "code": { "type": "string" },
+              "severity": { "type": "string", "enum": ["info", "warning", "critical"] },
+              "source": { "type": "string" },
+              "message": { "type": "string" },
+              "timestamp_ms": { "type": "integer", "minimum": 0 }
+            }
+          }
+        },
+        "ai_detections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "class", "confidence", "state", "timestamp_ms"],
+            "properties": {
+              "id": { "type": "string" },
+              "class": { "type": "string", "enum": ["fire", "smoke", "thermal_hotspot"] },
+              "confidence": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+              "state": { "type": "string", "enum": ["potential", "repeated", "verified"] },
+              "box": {
+                "type": "object",
+                "properties": {
+                  "x": { "type": "number" },
+                  "y": { "type": "number" },
+                  "width": { "type": "number" },
+                  "height": { "type": "number" }
+                }
+              },
+              "thermal_max_c": { "type": ["number", "null"] },
+              "timestamp_ms": { "type": "integer" }
+            }
+          }
+        }
+      }
+    },
+    "ManualCommand": {
+      "type": "object",
+      "required": ["version", "type", "sequence", "timestamp_ms", "roll", "pitch", "yaw", "throttle"],
+      "properties": {
+        "version": { "type": "integer", "enum": [1] },
+        "type": { "type": "string", "enum": ["manual_command"] },
+        "sequence": { "type": "integer", "minimum": 1 },
+        "client_id": { "type": "string" },
+        "timestamp_ms": { "type": "integer", "minimum": 0 },
+        "roll": { "type": "number", "minimum": -1.0, "maximum": 1.0 },
+        "pitch": { "type": "number", "minimum": -1.0, "maximum": 1.0 },
+        "yaw": { "type": "number", "minimum": -1.0, "maximum": 1.0 },
+        "throttle": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+      }
+    },
+    "ArmCommand": {
+      "type": "object",
+      "required": ["version", "type", "sequence", "timestamp_ms", "arm", "confirmation_token"],
+      "properties": {
+        "version": { "type": "integer", "enum": [1] },
+        "type": { "type": "string", "enum": ["arm_command"] },
+        "sequence": { "type": "integer", "minimum": 1 },
+        "client_id": { "type": "string" },
+        "timestamp_ms": { "type": "integer", "minimum": 0 },
+        "arm": { "type": "boolean" },
+        "confirmation_token": { "type": "string", "minLength": 8 }
+      }
+    },
+    "EmergencyStopCommand": {
+      "type": "object",
+      "required": ["version", "type", "sequence", "timestamp_ms"],
+      "properties": {
+        "version": { "type": "integer", "enum": [1] },
+        "type": { "type": "string", "enum": ["emergency_stop"] },
+        "sequence": { "type": "integer", "minimum": 1 },
+        "client_id": { "type": "string" },
+        "timestamp_ms": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "ControlClaim": {
+      "type": "object",
+      "required": ["version", "type", "sequence", "client_id", "action", "timestamp_ms"],
+      "properties": {
+        "version": { "type": "integer", "enum": [1] },
+        "type": { "type": "string", "enum": ["control_claim"] },
+        "sequence": { "type": "integer", "minimum": 1 },
+        "client_id": { "type": "string" },
+        "action": { "type": "string", "enum": ["request_lease", "release_lease", "heartbeat"] },
+        "timestamp_ms": { "type": "integer" }
+      }
+    },
+    "CommandAck": {
+      "type": "object",
+      "required": ["version", "type", "sequence", "status", "timestamp_ms"],
+      "properties": {
+        "version": { "type": "integer", "enum": [1] },
+        "type": { "type": "string", "enum": ["ack"] },
+        "sequence": { "type": "integer" },
+        "status": { "type": "string", "enum": ["accepted", "rejected", "executed"] },
+        "code": { "type": "string" },
+        "message": { "type": "string" },
+        "timestamp_ms": { "type": "integer" }
+      }
+    }
+  }
+}

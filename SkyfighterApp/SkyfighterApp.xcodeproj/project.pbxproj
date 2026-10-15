@@ -1,0 +1,585 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		15C59D52B31195D148F22C14 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 958DA2DBEA6F3638F67CFC43 /* DashboardView.swift */; };
+		18FF8CA5090F9F8E7779CE72 /* DroneMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECFA95240AB09ED017AF81CC /* DroneMapView.swift */; };
+		2A2F63EE856473B1EF858081 /* ArmingModalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44D403D46C6A5834BDA1E453 /* ArmingModalView.swift */; };
+		35ED065F65B081927A323708 /* VirtualJoystickView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FDF2E6EB3C14F19F14EE28D /* VirtualJoystickView.swift */; };
+		3D87D95D8BEF55C01E0E99CA /* StatusBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7A903C18167150BE92C48B5 /* StatusBadge.swift */; };
+		451CA9BE36D4A3DAC8D33872 /* WiFiTCPTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAFE3F0784E40F5865D5E9C1 /* WiFiTCPTransport.swift */; };
+		4808EEF431A03F3176F6DA43 /* DroneTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFC83245A36FDAE02A373523 /* DroneTransport.swift */; };
+		57407515E66AEC9E0E779331 /* DroneConnectionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EABA1149075A0A992A52A37 /* DroneConnectionManager.swift */; };
+		70D46D9AEBF339179EE9F232 /* SkyfighterAppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8797E0409ADB2D4672ACA08D /* SkyfighterAppTests.swift */; };
+		71798E23E9D5C68C1F1142F8 /* ConnectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 294C3CD00E366D1826D1419D /* ConnectionView.swift */; };
+		73E9D5FD89D086FCC87064AE /* Telemetry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 042739F55B6645907F908582 /* Telemetry.swift */; };
+		756F295187468F9368D58937 /* FireAlertView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 875BEB9A6A6385BB3042F366 /* FireAlertView.swift */; };
+		7C0BB4F7E2648DE3B59A7EB8 /* ThrottleSliderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93ABD3916469626225224FEA /* ThrottleSliderView.swift */; };
+		8B020259F93026887B016865 /* GameControllerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F4BBA61D17073557DE3C51A /* GameControllerView.swift */; };
+		919D01A043EA5F6083DF9C7A /* TelemetryParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BC1631B0BF05BECF1233EF1 /* TelemetryParser.swift */; };
+		940311369B8EADA9744CFF98 /* RootTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC0F7140D649C566F0726BB7 /* RootTabView.swift */; };
+		A8CF69BF651C976DEC3E045C /* FireMonitoringService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24BA37BF84DBB30C8801E04F /* FireMonitoringService.swift */; };
+		A9E9F33341FFD51A84CC4FE7 /* Mission.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52B3A4702ED515A8CEEF3E71 /* Mission.swift */; };
+		B449AEF93FC402F72ED6FF93 /* HardwareStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7782D325AA1F42F0848B4066 /* HardwareStatus.swift */; };
+		BD999A6F877FEDDF91362789 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B82E53E605E1AF0E4F1E37E /* Theme.swift */; };
+		C33879934375D3ECB308A006 /* MissionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 056A5DC6B82806FD0B2AA840 /* MissionView.swift */; };
+		C34247B24F22E5EBBBDE74CB /* GameControllerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EAE9570F541A36723808EB8 /* GameControllerManager.swift */; };
+		CC7F3021408E3A4AE92D62A6 /* AppEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = D54038CB76C5409D8B0F6CA6 /* AppEntry.swift */; };
+		CE3502143EDDF9AA62F62D93 /* FlightCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = B39CA6404D38A56855D32817 /* FlightCommand.swift */; };
+		D28D591E2A8949CB75DB178C /* WiFiWebSocketTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20CDD6765D2B3D7F8836A168 /* WiFiWebSocketTransport.swift */; };
+		D482D4763E2B494C10E2FE26 /* MetricCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 083C00A7178E9B7FBE9B733C /* MetricCard.swift */; };
+		D52BEDF529AD40BAF3B4ED3F /* ConnectionConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFAA72C5D33489E61D5D3ECE /* ConnectionConfig.swift */; };
+		D66C69F96C2EFAF3968FE4E2 /* ManualControlView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2DC6CF0A24F8BE183DE2208 /* ManualControlView.swift */; };
+		D6D31B63E672896CC1F629A9 /* SkyfighterApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F594D0C55593F55490CDD074 /* SkyfighterApp.swift */; };
+		DF91494FB3EDBEAAA8F987BC /* EmergencyButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = D34DAC9C354F134B5FE5A796 /* EmergencyButton.swift */; };
+		E8FC340700BA5E13EC71074F /* MockDroneTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C834EB06832F1B6DC1E9F7CA /* MockDroneTransport.swift */; };
+		F3AAE85B3B3CCF56CF53FB29 /* FlightCommandValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72448C100198A2454A6607B0 /* FlightCommandValidator.swift */; };
+		FE82D158C45A3D86169B77DC /* MissionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BC46F9CF9F0EEB25FE929F4 /* MissionService.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		F8D84C9AC0D76EA5D7D61DC7 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 678173C8FA93D00666C37BBF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 05071B80EE125821C91FD464;
+			remoteInfo = SkyfighterApp;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		042739F55B6645907F908582 /* Telemetry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Telemetry.swift; sourceTree = "<group>"; };
+		056A5DC6B82806FD0B2AA840 /* MissionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MissionView.swift; sourceTree = "<group>"; };
+		083C00A7178E9B7FBE9B733C /* MetricCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricCard.swift; sourceTree = "<group>"; };
+		20CDD6765D2B3D7F8836A168 /* WiFiWebSocketTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WiFiWebSocketTransport.swift; sourceTree = "<group>"; };
+		24BA37BF84DBB30C8801E04F /* FireMonitoringService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FireMonitoringService.swift; sourceTree = "<group>"; };
+		294C3CD00E366D1826D1419D /* ConnectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionView.swift; sourceTree = "<group>"; };
+		44D403D46C6A5834BDA1E453 /* ArmingModalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArmingModalView.swift; sourceTree = "<group>"; };
+		52B3A4702ED515A8CEEF3E71 /* Mission.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Mission.swift; sourceTree = "<group>"; };
+		5B82E53E605E1AF0E4F1E37E /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		5FDF2E6EB3C14F19F14EE28D /* VirtualJoystickView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VirtualJoystickView.swift; sourceTree = "<group>"; };
+		72448C100198A2454A6607B0 /* FlightCommandValidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlightCommandValidator.swift; sourceTree = "<group>"; };
+		7782D325AA1F42F0848B4066 /* HardwareStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardwareStatus.swift; sourceTree = "<group>"; };
+		7BC1631B0BF05BECF1233EF1 /* TelemetryParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelemetryParser.swift; sourceTree = "<group>"; };
+		7DD2E80C9DB77652D95E672A /* SkyfighterApp.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = SkyfighterApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		875BEB9A6A6385BB3042F366 /* FireAlertView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FireAlertView.swift; sourceTree = "<group>"; };
+		8797E0409ADB2D4672ACA08D /* SkyfighterAppTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkyfighterAppTests.swift; sourceTree = "<group>"; };
+		8BC46F9CF9F0EEB25FE929F4 /* MissionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MissionService.swift; sourceTree = "<group>"; };
+		8C2224CBD3B014067964C141 /* SkyfighterAppTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SkyfighterAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		8EABA1149075A0A992A52A37 /* DroneConnectionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DroneConnectionManager.swift; sourceTree = "<group>"; };
+		93ABD3916469626225224FEA /* ThrottleSliderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThrottleSliderView.swift; sourceTree = "<group>"; };
+		958DA2DBEA6F3638F67CFC43 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
+		9EAE9570F541A36723808EB8 /* GameControllerManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControllerManager.swift; sourceTree = "<group>"; };
+		9F4BBA61D17073557DE3C51A /* GameControllerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControllerView.swift; sourceTree = "<group>"; };
+		B39CA6404D38A56855D32817 /* FlightCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlightCommand.swift; sourceTree = "<group>"; };
+		B7A903C18167150BE92C48B5 /* StatusBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBadge.swift; sourceTree = "<group>"; };
+		C834EB06832F1B6DC1E9F7CA /* MockDroneTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockDroneTransport.swift; sourceTree = "<group>"; };
+		D34DAC9C354F134B5FE5A796 /* EmergencyButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmergencyButton.swift; sourceTree = "<group>"; };
+		D54038CB76C5409D8B0F6CA6 /* AppEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEntry.swift; sourceTree = "<group>"; };
+		DAFE3F0784E40F5865D5E9C1 /* WiFiTCPTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WiFiTCPTransport.swift; sourceTree = "<group>"; };
+		E4F044B1FCD7C6A107977509 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		EC0F7140D649C566F0726BB7 /* RootTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootTabView.swift; sourceTree = "<group>"; };
+		ECFA95240AB09ED017AF81CC /* DroneMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DroneMapView.swift; sourceTree = "<group>"; };
+		F2DC6CF0A24F8BE183DE2208 /* ManualControlView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualControlView.swift; sourceTree = "<group>"; };
+		F594D0C55593F55490CDD074 /* SkyfighterApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkyfighterApp.swift; sourceTree = "<group>"; };
+		FFAA72C5D33489E61D5D3ECE /* ConnectionConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionConfig.swift; sourceTree = "<group>"; };
+		FFC83245A36FDAE02A373523 /* DroneTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DroneTransport.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		01233D820146452FF9DE8C16 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				7DD2E80C9DB77652D95E672A /* SkyfighterApp.app */,
+				8C2224CBD3B014067964C141 /* SkyfighterAppTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		180092892CC21E81895772A5 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				44D403D46C6A5834BDA1E453 /* ArmingModalView.swift */,
+				D34DAC9C354F134B5FE5A796 /* EmergencyButton.swift */,
+				083C00A7178E9B7FBE9B733C /* MetricCard.swift */,
+				B7A903C18167150BE92C48B5 /* StatusBadge.swift */,
+				93ABD3916469626225224FEA /* ThrottleSliderView.swift */,
+				5FDF2E6EB3C14F19F14EE28D /* VirtualJoystickView.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
+		2F8A9B9CFC52F8D36780CBBC = {
+			isa = PBXGroup;
+			children = (
+				579AA1F12E0743D88C5B9C80 /* iOSApp */,
+				A1C85506BD45F4318DCC9D67 /* SkyfighterApp */,
+				54F2EEC3AD7A0CCD840A5E1C /* SkyfighterAppTests */,
+				01233D820146452FF9DE8C16 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		3836E959EDD832B4A35E31B4 /* UI */ = {
+			isa = PBXGroup;
+			children = (
+				5B82E53E605E1AF0E4F1E37E /* Theme.swift */,
+				180092892CC21E81895772A5 /* Components */,
+				8E220E3B293B0C0FFEE610D7 /* Views */,
+			);
+			path = UI;
+			sourceTree = "<group>";
+		};
+		54F2EEC3AD7A0CCD840A5E1C /* SkyfighterAppTests */ = {
+			isa = PBXGroup;
+			children = (
+				8797E0409ADB2D4672ACA08D /* SkyfighterAppTests.swift */,
+			);
+			name = SkyfighterAppTests;
+			path = Tests/SkyfighterAppTests;
+			sourceTree = "<group>";
+		};
+		579AA1F12E0743D88C5B9C80 /* iOSApp */ = {
+			isa = PBXGroup;
+			children = (
+				D54038CB76C5409D8B0F6CA6 /* AppEntry.swift */,
+				E4F044B1FCD7C6A107977509 /* Info.plist */,
+			);
+			path = iOSApp;
+			sourceTree = "<group>";
+		};
+		61B87611E3177104E7400FB1 /* Transport */ = {
+			isa = PBXGroup;
+			children = (
+				FFC83245A36FDAE02A373523 /* DroneTransport.swift */,
+				C834EB06832F1B6DC1E9F7CA /* MockDroneTransport.swift */,
+				DAFE3F0784E40F5865D5E9C1 /* WiFiTCPTransport.swift */,
+				20CDD6765D2B3D7F8836A168 /* WiFiWebSocketTransport.swift */,
+			);
+			path = Transport;
+			sourceTree = "<group>";
+		};
+		6B23E3A3D1A294408A19F8CA /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				8EABA1149075A0A992A52A37 /* DroneConnectionManager.swift */,
+				24BA37BF84DBB30C8801E04F /* FireMonitoringService.swift */,
+				72448C100198A2454A6607B0 /* FlightCommandValidator.swift */,
+				9EAE9570F541A36723808EB8 /* GameControllerManager.swift */,
+				8BC46F9CF9F0EEB25FE929F4 /* MissionService.swift */,
+				7BC1631B0BF05BECF1233EF1 /* TelemetryParser.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		897595F40016AFF6BA18E867 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				FFAA72C5D33489E61D5D3ECE /* ConnectionConfig.swift */,
+				B39CA6404D38A56855D32817 /* FlightCommand.swift */,
+				7782D325AA1F42F0848B4066 /* HardwareStatus.swift */,
+				52B3A4702ED515A8CEEF3E71 /* Mission.swift */,
+				042739F55B6645907F908582 /* Telemetry.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		8E220E3B293B0C0FFEE610D7 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				294C3CD00E366D1826D1419D /* ConnectionView.swift */,
+				958DA2DBEA6F3638F67CFC43 /* DashboardView.swift */,
+				ECFA95240AB09ED017AF81CC /* DroneMapView.swift */,
+				875BEB9A6A6385BB3042F366 /* FireAlertView.swift */,
+				9F4BBA61D17073557DE3C51A /* GameControllerView.swift */,
+				F2DC6CF0A24F8BE183DE2208 /* ManualControlView.swift */,
+				056A5DC6B82806FD0B2AA840 /* MissionView.swift */,
+				EC0F7140D649C566F0726BB7 /* RootTabView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		A1C85506BD45F4318DCC9D67 /* SkyfighterApp */ = {
+			isa = PBXGroup;
+			children = (
+				F594D0C55593F55490CDD074 /* SkyfighterApp.swift */,
+				897595F40016AFF6BA18E867 /* Models */,
+				6B23E3A3D1A294408A19F8CA /* Services */,
+				61B87611E3177104E7400FB1 /* Transport */,
+				3836E959EDD832B4A35E31B4 /* UI */,
+			);
+			name = SkyfighterApp;
+			path = Sources/SkyfighterApp;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		05071B80EE125821C91FD464 /* SkyfighterApp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3E7D1249E9398FB1E63F91F3 /* Build configuration list for PBXNativeTarget "SkyfighterApp" */;
+			buildPhases = (
+				8FA76ABBC34675C7756A4A22 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SkyfighterApp;
+			packageProductDependencies = (
+			);
+			productName = SkyfighterApp;
+			productReference = 7DD2E80C9DB77652D95E672A /* SkyfighterApp.app */;
+			productType = "com.apple.product-type.application";
+		};
+		2FD158E8ACE07615C49B13DA /* SkyfighterAppTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9C4630DEB437C40FFE00BCB1 /* Build configuration list for PBXNativeTarget "SkyfighterAppTests" */;
+			buildPhases = (
+				39C420035AD77BECBAEACA23 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				8E9BF477D82D9C0FEB65819F /* PBXTargetDependency */,
+			);
+			name = SkyfighterAppTests;
+			packageProductDependencies = (
+			);
+			productName = SkyfighterAppTests;
+			productReference = 8C2224CBD3B014067964C141 /* SkyfighterAppTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		678173C8FA93D00666C37BBF /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					05071B80EE125821C91FD464 = {
+						DevelopmentTeam = MV8SMV87FP;
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = B1A6502D1E8F3AE445FC4A26 /* Build configuration list for PBXProject "SkyfighterApp" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 2F8A9B9CFC52F8D36780CBBC;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 01233D820146452FF9DE8C16 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				05071B80EE125821C91FD464 /* SkyfighterApp */,
+				2FD158E8ACE07615C49B13DA /* SkyfighterAppTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		39C420035AD77BECBAEACA23 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				70D46D9AEBF339179EE9F232 /* SkyfighterAppTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8FA76ABBC34675C7756A4A22 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CC7F3021408E3A4AE92D62A6 /* AppEntry.swift in Sources */,
+				2A2F63EE856473B1EF858081 /* ArmingModalView.swift in Sources */,
+				D52BEDF529AD40BAF3B4ED3F /* ConnectionConfig.swift in Sources */,
+				71798E23E9D5C68C1F1142F8 /* ConnectionView.swift in Sources */,
+				15C59D52B31195D148F22C14 /* DashboardView.swift in Sources */,
+				57407515E66AEC9E0E779331 /* DroneConnectionManager.swift in Sources */,
+				18FF8CA5090F9F8E7779CE72 /* DroneMapView.swift in Sources */,
+				4808EEF431A03F3176F6DA43 /* DroneTransport.swift in Sources */,
+				DF91494FB3EDBEAAA8F987BC /* EmergencyButton.swift in Sources */,
+				756F295187468F9368D58937 /* FireAlertView.swift in Sources */,
+				A8CF69BF651C976DEC3E045C /* FireMonitoringService.swift in Sources */,
+				CE3502143EDDF9AA62F62D93 /* FlightCommand.swift in Sources */,
+				F3AAE85B3B3CCF56CF53FB29 /* FlightCommandValidator.swift in Sources */,
+				C34247B24F22E5EBBBDE74CB /* GameControllerManager.swift in Sources */,
+				8B020259F93026887B016865 /* GameControllerView.swift in Sources */,
+				B449AEF93FC402F72ED6FF93 /* HardwareStatus.swift in Sources */,
+				D66C69F96C2EFAF3968FE4E2 /* ManualControlView.swift in Sources */,
+				D482D4763E2B494C10E2FE26 /* MetricCard.swift in Sources */,
+				A9E9F33341FFD51A84CC4FE7 /* Mission.swift in Sources */,
+				FE82D158C45A3D86169B77DC /* MissionService.swift in Sources */,
+				C33879934375D3ECB308A006 /* MissionView.swift in Sources */,
+				E8FC340700BA5E13EC71074F /* MockDroneTransport.swift in Sources */,
+				940311369B8EADA9744CFF98 /* RootTabView.swift in Sources */,
+				D6D31B63E672896CC1F629A9 /* SkyfighterApp.swift in Sources */,
+				3D87D95D8BEF55C01E0E99CA /* StatusBadge.swift in Sources */,
+				73E9D5FD89D086FCC87064AE /* Telemetry.swift in Sources */,
+				919D01A043EA5F6083DF9C7A /* TelemetryParser.swift in Sources */,
+				BD999A6F877FEDDF91362789 /* Theme.swift in Sources */,
+				7C0BB4F7E2648DE3B59A7EB8 /* ThrottleSliderView.swift in Sources */,
+				35ED065F65B081927A323708 /* VirtualJoystickView.swift in Sources */,
+				451CA9BE36D4A3DAC8D33872 /* WiFiTCPTransport.swift in Sources */,
+				D28D591E2A8949CB75DB178C /* WiFiWebSocketTransport.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		8E9BF477D82D9C0FEB65819F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 05071B80EE125821C91FD464 /* SkyfighterApp */;
+			targetProxy = F8D84C9AC0D76EA5D7D61DC7 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		2DF064789579452FE32E56EE /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = MV8SMV87FP;
+				INFOPLIST_FILE = iOSApp/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.skyfighter.app;
+				PRODUCT_NAME = SkyfighterApp;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		58FF8F5FCB050C0B7A178328 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.skyfighter.app.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SkyfighterApp.app/SkyfighterApp";
+			};
+			name = Debug;
+		};
+		CCB9686E68257D221978B4E9 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = MV8SMV87FP;
+				INFOPLIST_FILE = iOSApp/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.skyfighter.app;
+				PRODUCT_NAME = SkyfighterApp;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		D593A0A0CF6C621D50B78331 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		ECD7EBA9DFAC05E0B4738DAA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.skyfighter.app.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SkyfighterApp.app/SkyfighterApp";
+			};
+			name = Release;
+		};
+		F7371B7437FF85750174AC7D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		3E7D1249E9398FB1E63F91F3 /* Build configuration list for PBXNativeTarget "SkyfighterApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2DF064789579452FE32E56EE /* Debug */,
+				CCB9686E68257D221978B4E9 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		9C4630DEB437C40FFE00BCB1 /* Build configuration list for PBXNativeTarget "SkyfighterAppTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				58FF8F5FCB050C0B7A178328 /* Debug */,
+				ECD7EBA9DFAC05E0B4738DAA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		B1A6502D1E8F3AE445FC4A26 /* Build configuration list for PBXProject "SkyfighterApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F7371B7437FF85750174AC7D /* Debug */,
+				D593A0A0CF6C621D50B78331 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 678173C8FA93D00666C37BBF /* Project object */;
+}

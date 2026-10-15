@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>SKYFIGHTER — Forest Fire Drone Ground Control Station</title>
+  
+  <meta name="description" content="Cross-platform UAV Ground Control Station for real-time forest fire detection, dual-band thermal/RGB monitoring, and sensor telemetry.">
+  <meta name="theme-color" content="#ff3b30">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="SKYFIGHTER">
+  
+  <!-- Favicon & PWA Icons -->
+  <link rel="icon" type="image/png" href="./icons/favicon.png">
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+  <link rel="manifest" href="./manifest.webmanifest">
+  
+  <!-- CSS Stylesheet -->
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body class="theme-dark">
+  <div id="app" class="app-layout">
+    
+    <!-- TOP TACTICAL HUD HEADER -->
+    <header class="hud-header" id="hud-header">
+      <div class="header-left">
+        <div class="brand-badge">
+          <img src="./icons/favicon.png" alt="Skyfighter Icon" class="brand-icon">
+          <div class="brand-text">
+            <span class="brand-title">SKYFIGHTER</span>
+            <span class="brand-sub">TACTICAL GCS v1.1</span>
+          </div>
+        </div>
+        <div id="sim-badge" class="sim-pill active">SIMULATION MODE</div>
+      </div>
+      
+      <div class="header-center">
+        <!-- Telemetry Status Pills -->
+        <div class="status-indicator-group">
+          <div id="conn-pill" class="status-pill status-simulated">
+            <span class="pill-dot"></span>
+            <span id="conn-label">SIMULATED</span>
+          </div>
+          <div id="armed-pill" class="status-pill status-disarmed">
+            <span class="pill-icon">⬡</span>
+            <span id="armed-label">DISARMED</span>
+          </div>
+          <div id="gps-pill" class="status-pill status-gps">
+            <span class="pill-icon">🛰</span>
+            <span id="gps-label">GPS FIX (9 SAT)</span>
+          </div>
+          <div id="battery-pill" class="status-pill status-battery">
+            <span class="pill-icon">⚡</span>
+            <span id="battery-label">BATTERY: UNAVAILABLE</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <button id="btn-audio-mute" class="hud-btn" title="Toggle Buzzer Alarm" aria-label="Toggle Buzzer">
+          <span id="mute-icon">🔔</span>
+        </button>
+        <button id="btn-sim-toggle" class="hud-btn hud-btn-sim" title="Toggle Live Gateway / Simulation Mode">
+          <span>Mode: Sim</span>
+        </button>
+        <button id="btn-emergency-header" class="hud-btn hud-btn-estop" title="EMERGENCY MOTOR CUT" aria-label="Emergency Stop">
+          <span>E-STOP</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- MAIN INTERFACE BODY -->
+    <div class="app-body">
+      
+      <!-- DESKTOP / TABLET SIDEBAR NAVIGATION -->
+      <nav class="tactical-sidebar" id="tactical-sidebar" aria-label="Main Navigation">
+        <ul class="nav-menu">
+          <li class="nav-item active" data-screen="dashboard">
+            <span class="nav-icon">📊</span>
+            <span class="nav-text">Dashboard</span>
+          </li>
+          <li class="nav-item" data-screen="livecam">
+            <span class="nav-icon">📹</span>
+            <span class="nav-text">RGB Live Cam</span>
+          </li>
+          <li class="nav-item" data-screen="thermal">
+            <span class="nav-icon">🔥</span>
+            <span class="nav-text">Thermal Cam</span>
+          </li>
+          <li class="nav-item" data-screen="map">
+            <span class="nav-icon">🗺️</span>
+            <span class="nav-text">Fire Map</span>
+          </li>
+          <li class="nav-item" data-screen="alerts">
+            <span class="nav-icon">🚨</span>
+            <span class="nav-text">Fire Alerts</span>
+            <span id="alert-counter-badge" class="nav-badge hidden">0</span>
+          </li>
+          <li class="nav-item" data-screen="flight">
+            <span class="nav-icon">🕹️</span>
+            <span class="nav-text">Flight Controls</span>
+          </li>
+          <li class="nav-item" data-screen="diagnostics">
+            <span class="nav-icon">🩺</span>
+            <span class="nav-text">Diagnostics</span>
+          </li>
+          <li class="nav-item" data-screen="connection">
+            <span class="nav-icon">📶</span>
+            <span class="nav-text">Connection</span>
+          </li>
+          <li class="nav-item" data-screen="history">
+            <span class="nav-icon">📜</span>
+            <span class="nav-text">Event Log</span>
+          </li>
+          <li class="nav-item" data-screen="about">
+            <span class="nav-icon">ℹ️</span>
+            <span class="nav-text">About & Install</span>
+          </li>
+        </ul>
+
+        <div class="sidebar-footer">
+          <div class="heartbeat-indicator">
+            <span class="pulse-indicator"></span>
+            <span id="latency-text">LATENCY: 18ms</span>
+          </div>
+          <div class="firmware-tag">FW: ESP32-DEV-1.1</div>
+        </div>
+      </nav>
+
+      <!-- VIEWPORTS CONTAINER -->
+      <main class="content-viewport" id="content-viewport">
+        
+        <!-- ======================================================= -->
+        <!-- SCREEN 1: DASHBOARD -->
+        <!-- ======================================================= -->
+        <section id="screen-dashboard" class="screen-view active">
+          <!-- Active Hazard Banner -->
+          <div id="dashboard-hazard-banner" class="hazard-banner banner-normal">
+            <div class="banner-icon-col">
+              <span id="hazard-icon">🛡️</span>
+            </div>
+            <div class="banner-info-col">
+              <div class="banner-title" id="hazard-title">SYSTEM PATROL NORMAL</div>
+              <div class="banner-desc" id="hazard-desc">All environmental sensors and optical flame detectors within nominal baseline thresholds.</div>
+            </div>
+            <div class="banner-action-col">
+              <button id="btn-quick-triage" class="btn-action-sm">Acknowledge</button>
+            </div>
+          </div>
+
+          <!-- Quick Metric Grid -->
+          <div class="metric-grid">
+            <div class="metric-card">
+              <div class="metric-header">
+                <span class="metric-label">AMBIENT TEMP (DHT11)</span>
+                <span class="metric-pin">GPIO 4</span>
+              </div>
+              <div class="metric-value" id="val-temp">28.4 <span class="unit">°C</span></div>
+              <div class="metric-bar-track">
+                <div class="metric-bar-fill" id="bar-temp" style="width: 35%"></div>
+              </div>
+              <div class="metric-sub" id="sub-temp">Nominal range (&lt; 50°C)</div>
+            </div>
+
+            <div class="metric-card">
+              <div class="metric-header">
+                <span class="metric-label">HUMIDITY (DHT11)</span>
+                <span class="metric-pin">GPIO 4</span>
+              </div>
+              <div class="metric-value" id="val-humidity">46.5 <span class="unit">%</span></div>
+              <div class="metric-bar-track">
+                <div class="metric-bar-fill" id="bar-humidity" style="width: 46%"></div>
+              </div>
+              <div class="metric-sub">Forest fire risk: Moderate</div>
+            </div>
+
+            <div class="metric-card">
+              <div class="metric-header">
+                <span class="metric-label">SMOKE / GAS (MQ-2)</span>
+                <span class="metric-pin">GPIO 34 ADC</span>
+              </div>
+              <div class="metric-value" id="val-smoke">412 <span class="unit">ADC</span></div>
+              <div class="metric-bar-track">
+                <div class="metric-bar-fill fill-smoke" id="bar-smoke" style="width: 20%"></div>
+              </div>
+              <div class="metric-sub" id="sub-smoke">Baseline: 350 | Safe</div>
+            </div>
+
+            <div class="metric-card">
+              <div class="metric-header">
+                <span class="metric-label">FLAME SENSOR</span>
+                <span class="metric-pin">GPIO 27</span>
+              </div>
+              <div class="metric-value flame-safe" id="val-flame">CLEAR</div>
+              <div class="metric-sub">Active-low optical trigger</div>
+            </div>
+
+            <div class="metric-card">
+              <div class="metric-header">
+                <span class="metric-label">IMU ATTITUDE (MPU6050)</span>
+                <span class="metric-pin">I2C 0x68</span>
+              </div>
+              <div class="metric-value" id="val-attitude">R: 0.0° | P: 0.0°</div>
+              <div class="metric-sub" id="sub-mpu">6-DoF Gyro / Accel Online</div>
+            </div>
+
+            <div class="metric-card">
+              <div class="metric-header">
+                <span class="metric-label">TACTICAL GPS</span>
+                <span class="metric-pin">NEO-6M UART2</span>
+              </div>
+              <div class="metric-value text-gps" id="val-coords">12.971600, 77.594600</div>
+              <div class="metric-sub" id="sub-gps">Alt: 24.5m | Sats: 9</div>
+            </div>
+          </div>
+
+          <!-- Dual Telemetry & Flight State View -->
+          <div class="dashboard-split-row">
+            <div class="panel-box">
+              <div class="panel-box-header">
+                <h3>DRONE SUBSYSTEM CAPABILITIES</h3>
+                <span class="badge-lock">FIRMWARE GATED</span>
+              </div>
+              <div class="capability-list">
+                <div class="cap-item">
+                  <span class="cap-name">Manual Flight Motor Mixing</span>
+                  <span class="cap-status cap-off" id="cap-manual">LOCKED (Sim Only)</span>
+                </div>
+                <div class="cap-item">
+                  <span class="cap-name">Autonomous Waypoint Navigation</span>
+                  <span class="cap-status cap-off" id="cap-auto">NOT VERIFIED</span>
+                </div>
+                <div class="cap-item">
+                  <span class="cap-name">Autonomous Return-to-Home (RTH)</span>
+                  <span class="cap-status cap-off" id="cap-rth">UNAVAILABLE</span>
+                </div>
+                <div class="cap-item">
+                  <span class="cap-name">Dual RGB + Radiometric Thermal Cam</span>
+                  <span class="cap-status cap-on" id="cap-camera">READY (Simulated Feed)</span>
+                </div>
+                <div class="cap-item">
+                  <span class="cap-name">Onboard Warning Buzzer</span>
+                  <span class="cap-status cap-on" id="cap-buzzer">ACTIVE (GPIO 26)</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="panel-box">
+              <div class="panel-box-header">
+                <h3>RECENT INCIDENT NOTIFICATIONS</h3>
+                <button class="btn-text-action" id="btn-dash-view-all">View All Alerts</button>
+              </div>
+              <div id="dashboard-recent-alerts" class="recent-alerts-list">
+                <div class="empty-state">No active fire or smoke alerts recorded.</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ======================================================= -->
+        <!-- SCREEN 2: RGB LIVE CAMERA -->
+        <!-- ======================================================= -->
+        <section id="screen-livecam" class="screen-view">
+          <div class="view-header">
+            <div>
+              <h2>RGB Tactical Camera Stream</h2>
+              <p class="section-desc">Live high-definition video feed with edge AI visual fire & smoke detection overlays.</p>
+            </div>
+            <div class="view-actions">
+              <button id="btn-toggle-ai-boxes" class="btn-toggle active">AI Bounding Boxes: ON</button>
+              <button id="btn-cam-snapshot" class="btn-secondary">Capture Snapshot</button>
+            </div>
+          </div>
+
+          <div class="camera-canvas-container">
+            <canvas id="canvas-rgb" width="960" height="540"></canvas>
+            <div class="camera-hud-overlay">
+              <div class="hud-top-left">
+                <span class="rec-dot"></span> LIVE FEED [RGB]
+                <span class="fps-tag" id="rgb-fps">30 FPS</span>
+              </div>
+              <div class="hud-top-right">
+                <span id="rgb-timestamp">2026-10-15 12:00:00 UTC</span>
+              </div>
+              <div class="hud-center-crosshair">
+                <div class="cross-line cross-h"></div>
+                <div class="cross-line cross-v"></div>
+                <div class="cross-box"></div>
+              </div>
+              <div class="hud-bottom-bar">
+                <div id="ai-detection-tag" class="detection-pill">AI INFERENCE: ACTIVE (0.92 CONF)</div>
+                <div class="hud-drone-stats">ALT: 32m | HDG: 142° | SPD: 4.2 m/s</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="camera-controls-bar">
+            <div class="control-item">
+              <label>AI Confidence Threshold:</label>
+              <input type="range" id="slider-conf" min="50" max="95" value="75">
+              <span id="val-conf-threshold">75%</span>
+            </div>
+            <div class="control-item">
+              <label>Simulated Scenario:</label>
+              <select id="select-cam-scenario" class="tactical-select">
+                <option value="fire_smoke">Active Canopy Wildfire (Fire + Heavy Smoke)</option>
+                <option value="smoke_plume">Early Smoldering Smoke Plume</option>
+                <option value="clear_forest">Normal Clear Canopy Patrol</option>
+                <option value="high_heat">Thermal Hotspot / Campfire</option>
+              </select>
+            </div>
+          </div>
+        </section>
+
+        <!-- ======================================================= -->
+        <!-- SCREEN 3: THERMAL CAMERA -->
+        <!-- ======================================================= -->
+        <section id="screen-thermal" class="screen-view">
+          <div class="view-header">
+            <div>
+              <h2>Thermal Radiometric Imaging</h2>
+              <p class="section-desc">Long-Wave Infrared (LWIR) false-color thermal heatmap with spot temperature pyrometry.</p>
+            </div>
+            <div class="view-actions">
+              <label class="palette-label">Palette:</label>
+              <select id="select-thermal-palette" class="tactical-select">
+                <option value="ironbow">Ironbow (Ember / Blue)</option>
+                <option value="inferno">Inferno</option>
+                <option value="rainbow">Rainbow / Jet</option>
+                <option value="whitehot">White Hot (Monochrome)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="camera-canvas-container">
+            <canvas id="canvas-thermal" width="960" height="540"></canvas>
+            
+            <div class="thermal-hud-overlay">
+              <div class="thermal-spot-readouts">
+                <div class="spot-card spot-max">
+                  <span class="spot-title">MAX TEMP</span>
+                  <span class="spot-val" id="thermal-max-temp">348.6 °C</span>
+                </div>
+                <div class="spot-card spot-center">
+                  <span class="spot-title">CENTER SPOT</span>
+                  <span class="spot-val" id="thermal-center-temp">42.1 °C</span>
+                </div>
+                <div class="spot-card spot-min">
+                  <span class="spot-title">MIN TEMP</span>
+                  <span class="spot-val" id="thermal-min-temp">18.2 °C</span>
+                </div>
+              </div>
+              
+              <div class="thermal-legend-bar">
+                <div class="legend-scale" id="thermal-legend-gradient"></div>
+                <div class="legend-labels">
+                  <span>15°C</span>
+                  <span>100°C</span>
+                  <span>250°C</span>
+                  <span>400°C</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="camera-controls-bar">
+            <div class="control-item">
+              <label>Hotspot Trigger Threshold:</label>
+              <input type="range" id="slider-temp-thresh" min="60" max="350" value="85">
+              <span id="val-temp-threshold">85°C</span>
+            </div>
+            <div class="control-item">
+              <span class="info-note">Hardware note: Native FLIR/MLX90640 requires I2C bridge; simulated in current release.</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- ======================================================= -->
+        <!-- SCREEN 4: FIRE MAP -->
+        <!-- ======================================================= -->
+        <section id="screen-map" class="screen-view">
+          <div class="view-header">
+            <div>
+              <h2>Tactical Wildfire GPS Map</h2>
+              <p class="section-desc">Interactive geo-referenced map plotting live drone position, flight perimeter, and fire incident markers.</p>
+            </div>
+            <div class="view-actions">
+              <button id="btn-map-center-drone" class="btn-secondary">Center on Drone</button>
+              <button id="btn-map-clear-pins" class="btn-secondary">Clear Old Markers</button>
+            </div>
+          </div>
+
+          <div class="tactical-map-container">
+            <canvas id="canvas-tactical-map" width="1000" height="600"></canvas>
+            
+            <!-- Map HUD overlays -->
+            <div class="map-hud-overlay">
+              <div class="map-status-pill">
+                <span id="map-drone-pos">DRONE: 12.971600 N, 77.594600 E</span>
+              </div>
+              <div class="map-legend">
+                <div class="legend-entry"><span class="legend-sym sym-drone">▲</span> Live Drone</div>
+                <div class="legend-entry"><span class="legend-sym sym-fire">●</span> Confirmed Fire</div>
+                <div class="legend-entry"><span class="legend-sym sym-smoke">●</span> Smoke Anomaly</div>
+                <div class="legend-entry"><span class="legend-sym sym-home">⌂</span> Pilot Home</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="map-coordinates-bar">
+            <div class="coord-col">
+              <span class="coord-label">LATITUDE:</span>
+              <span class="coord-data" id="map-lat">12.971600°</span>
+            </div>
+            <div class="coord-col">
+              <span class="coord-label">LONGITUDE:</span>
+              <span class="coord-data" id="map-lon">77.594600°</span>
+            </div>
+            <div class="coord-col">
+              <span class="coord-label">ALTITUDE:</span>
+              <span class="coord-data" id="map-alt">24.5 m</span>
+            </div>
+            <div class="coord-col">
+              <span class="coord-label">SATELLITES:</span>
+              <span class="coord-data" id="map-sats">9 Locked (3D Fix)</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- ======================================================= -->
+        <!-- SCREEN 5: FIRE ALERTS -->
+        <!-- ======================================================= -->
+        <section id="screen-alerts" class="screen-view">
+          <div class="view-header">
+            <div>
+              <h2>Fire Alerts & Incident Triage</h2>
+              <p class="section-desc">Real-time incident queue, sensor hazard evaluations, and emergency dispatch workflows.</p>
+            </div>
+            <div class="view-actions">
+              <button id="btn-test-siren" class="btn-secondary">Test Buzzer</button>
+              <button id="btn-export-incidents" class="btn-primary">Export Incident Report (JSON)</button>
+            </div>
+          </div>
+
+          <!-- Active Emergency Banner -->
+          <div id="alerts-status-card" class="incident-status-card status-nominal">
+            <div class="status-card-icon" id="incident-card-icon">✓</div>
+            <div class="status-card-body">
+              <h3 id="incident-card-headline">No Emergency Hazards Active</h3>
+              <p id="incident-card-detail">Environmental telemetry indicates safe forest conditions. Audible buzzer is currently silent.</p>
+            </div>
+          </div>
+
+          <!-- Incident Table -->
+          <div class="table-container">
+            <table class="tactical-table">
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Severity</th>
+                  <th>Detection Source</th>
+                  <th>Incident Type</th>
+                  <th>GPS Location</th>
+                  <th>Verification Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="incidents-table-body">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ======================================================= -->
+        <!-- SCREEN 6: SIMULATION FLIGHT CONTROLS -->
+        <!-- ======================================================= -->
+        <section id="screen-flight" class="screen-view">
+          <div class="view-header">
+            <div>
+              <h2>Simulation Flight Controls</h2>
+              <p class="section-desc">Pilot stick interface for control testing. Physical ESC motor signals are locked out in initial release.</p>
+            </div>
+            <div class="view-actions">
+              <button id="btn-open-arming" class="btn-arm-modal">ARM DRONE (Simulated)</button>
+            </div>
+          </div>
+
+          <div class="safety-lockout-notice">
+            <span class="notice-icon">⚠️</span>
+            <div class="notice-text">
+              <strong>SAFETY LOCKOUT ACTIVE:</strong> Firmware <code>sketch.ino</code> does not implement motor mixing or PID stabilization. All cyclic and collective stick inputs operate in <strong>Simulation Mode only</strong>. Do not enable real motor control until hardware flight controller is certified.
+            </div>
+          </div>
+
+          <div class="flight-controls-grid">
+            
+            <!-- Left: Throttle Collective Slider -->
+            <div class="flight-panel throttle-panel">
+              <h3>THROTTLE (COLLECTIVE)</h3>
+              <div class="throttle-slider-container">
+                <input type="range" id="slider-throttle" min="0" max="100" value="0" orient="vertical" class="slider-vertical">
+                <div class="throttle-readout">
+                  <span class="throttle-pct" id="throttle-pct-label">0%</span>
+                  <span class="throttle-state" id="throttle-armed-state">DISARMED LOCKED</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Center: Virtual Cyclic Joystick -->
+            <div class="flight-panel joystick-panel">
+              <h3>CYCLIC STICK (ROLL & PITCH)</h3>
+              <div class="joystick-arena" id="joystick-arena">
+                <div class="joystick-crosshair-h"></div>
+                <div class="joystick-crosshair-v"></div>
+                <div class="joystick-thumb" id="joystick-thumb"></div>
+              </div>
+              <div class="joystick-readout">
+                <span>ROLL: <strong id="stick-roll-val">0.00</strong></span>
+                <span>PITCH: <strong id="stick-pitch-val">0.00</strong></span>
+              </div>
+              <div class="yaw-controls-row">
+                <button id="btn-yaw-left" class="btn-secondary">◀ YAW LEFT</button>
+                <button id="btn-yaw-center" class="btn-secondary">CENTER</button>
+                <button id="btn-yaw-right" class="btn-secondary">YAW RIGHT ▶</button>
+              </div>
+            </div>
+
+            <!-- Right: Attitude Indicators & E-STOP -->
+            <div class="flight-panel attitude-panel">
+              <h3>ATTITUDE DIALS</h3>
+              <div class="attitude-dials-row">
+                <div class="attitude-gauge" id="gauge-roll">
+                  <div class="gauge-dial" id="dial-roll"></div>
+                  <span class="gauge-label">ROLL: 0.0°</span>
+                </div>
+                <div class="attitude-gauge" id="gauge-pitch">
+                  <div class="gauge-dial" id="dial-pitch"></div>
+                  <span class="gauge-label">PITCH: 0.0°</span>
+                </div>
+              </div>
+
+              <div class="estop-container">
+                <button id="btn-flight-estop" class="btn-danger-massive">
+                  <span class="estop-title">EMERGENCY STOP</span>
+                  <span class="estop-sub">SHUT DOWN MOTORS</span>
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- ======================================================= -->
+        <!-- SCREEN 7: SENSOR DIAGNOSTICS -->
+        <!-- ======================================================= -->
+        <section id="screen-diagnostics" class="screen-view">
+          <div class="view-header">
+            <div>
+              <h2>Sensor Diagnostics & Bus Health</h2>
+              <p class="section-desc">Raw bitstream and register readouts from onboard sensor hardware.</p>
+            </div>
+            <div class="view-actions">
+              <button id="btn-calibrate-baseline" class="btn-secondary">Calibrate MQ-2 Baseline</button>
+            </div>
+          </div>
+
+          <div class="diagnostics-grid">
+            <div class="diag-card">
+              <div class="diag-card-header">
+                <h4>MPU6050 6-DoF IMU (I2C 0x68)</h4>
+                <span class="diag-badge-ok" id="badge-mpu">HEALTHY</span>
+              </div>
+              <table class="diag-table">
+                <tr><td>Accel X / Y / Z:</td><td id="diag-accel">0.01g / 0.02g / 0.98g</td></tr>
+                <tr><td>Gyro X / Y / Z:</td><td id="diag-gyro">0.12°/s / -0.05°/s / 0.00°/s</td></tr>
+                <tr><td>Chip Temperature:</td><td id="diag-mpu-temp">31.4 °C</td></tr>
+                <tr><td>I2C Bus ACK:</td><td class="text-green">0x00 SUCCESS</td></tr>
+              </table>
+            </div>
+
+            <div class="diag-card">
+              <div class="diag-card-header">
+                <h4>DHT11 Environmental Sensor (GPIO 4)</h4>
+                <span class="diag-badge-ok" id="badge-dht">HEALTHY</span>
+              </div>
+              <table class="diag-table">
+                <tr><td>Ambient Temperature:</td><td id="diag-dht-temp">28.4 °C</td></tr>
+                <tr><td>Relative Humidity:</td><td id="diag-dht-humidity">46.5 %</td></tr>
+                <tr><td>Check-Sum Validity:</td><td class="text-green">VALID</td></tr>
+                <tr><td>Sampling Rate:</td><td>0.5 Hz (2000 ms)</td></tr>
+              </table>
+            </div>
+
+            <div class="diag-card">
+              <div class="diag-card-header">
+                <h4>MQ-2 Smoke & Gas Detector (GPIO 34 ADC)</h4>
+                <span class="diag-badge-ok" id="badge-mq2">CALIBRATED</span>
+              </div>
+              <table class="diag-table">
+                <tr><td>Raw 12-Bit ADC:</td><td id="diag-mq2-raw">412 / 4095</td></tr>
+                <tr><td>Stored Baseline:</td><td id="diag-mq2-base">350</td></tr>
+                <tr><td>Delta Above Baseline:</td><td id="diag-mq2-delta">+62 ADC (Safe)</td></tr>
+                <tr><td>Alarm Trigger Threshold:</td><td>Baseline + 500</td></tr>
+              </table>
+            </div>
+
+            <div class="diag-card">
+              <div class="diag-card-header">
+                <h4>Digital Flame Sensor (GPIO 27)</h4>
+                <span class="diag-badge-ok" id="badge-flame">MONITORING</span>
+              </div>
+              <table class="diag-table">
+                <tr><td>Pin Logic Level:</td><td id="diag-flame-pin">HIGH (Inactive)</td></tr>
+                <tr><td>Trigger Polarity:</td><td>Active-LOW</td></tr>
+                <tr><td>Optical Bandwidth:</td><td>760nm - 1100nm IR</td></tr>
+                <tr><td>Detection Status:</td><td class="text-green">NO FLAME DETECTED</td></tr>
+              </table>
+            </div>
+
+            <div class="diag-card">
+              <div class="diag-card-header">
+                <h4>NEO-6M GPS Receiver (UART2 GPIO 16/17)</h4>
+                <span class="diag-badge-ok" id="badge-gps">3D FIX</span>
+              </div>
+              <table class="diag-table">
+                <tr><td>Baud Rate:</td><td>9600 8N1</td></tr>
+                <tr><td>Parsed Sentences:</td><td>$GPGGA, $GNGGA</td></tr>
+                <tr><td>Satellites in View:</td><td id="diag-gps-sats">9</td></tr>
+                <tr><td>Fix Age:</td><td id="diag-gps-age">420 ms</td></tr>
+              </table>
+            </div>
+
+            <div class="diag-card">
+              <div class="diag-card-header">
+                <h4>Audible Alert Buzzer (GPIO 26)</h4>
+                <span class="diag-badge-ok">READY</span>
+              </div>
+              <table class="diag-table">
+                <tr><td>Pin State:</td><td id="diag-buzzer-state">LOW (Silent)</td></tr>
+                <tr><td>Autonomous Onboard Trigger:</td><td class="text-green">ENABLED</td></tr>
+                <tr><td>Failsafe Link:</td><td>Triggered on Flame / Smoke without GCS</td></tr>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ======================================================= -->
+        <!-- SCREEN 8: CONNECTION SETTINGS -->
+        <!-- ======================================================= -->
+        <section id="screen-connection" class="screen-view">
+          <div class="view-header">
+            <div>
+              <h2>Connection & Gateway Configuration</h2>
+              <p class="section-desc">Manage Wi-Fi transport, WebSocket endpoint, and exclusive pilot control lease.</p>
+            </div>
+          </div>
+
+          <div class="settings-grid">
+            <div class="settings-panel">
+              <h3>Gateway WebSocket Settings</h3>
+              <div class="form-group">
+                <label>Connection Mode:</label>
+                <select id="conn-mode-select" class="tactical-select">
+                  <option value="simulation" selected>Built-in Realistic Simulation</option>
+                  <option value="websocket">Live Gateway (ESP32 #2 WebSocket)</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label>ESP32 Gateway WebSocket URL:</label>
+                <input type="text" id="input-ws-url" value="ws://192.168.4.1:8080/telemetry" class="tactical-input">
+                <span class="input-hint">Default SoftAP IP is 192.168.4.1 on port 8080</span>
+              </div>
+
+              <div class="form-row">
+                <button id="btn-ws-connect" class="btn-primary">Connect to Gateway</button>
+                <button id="btn-ws-disconnect" class="btn-secondary">Disconnect</button>
+              </div>
+
+              <div class="connection-diagnostics-box">
+                <h4>Connection Health Status:</h4>
+                <div id="ws-status-msg" class="text-muted">Using built-in simulation mode.</div>
+              </div>
+            </div>
+
+            <div class="settings-panel">
+              <h3>Pilot Control Lease Management</h3>
+              <p class="panel-desc">Only one GCS client can command the drone at any time to prevent competing controls.</p>
+
+              <div class="form-group">
+                <label>Client Station Identifier:</label>
+                <input type="text" id="input-client-id" value="SKYFIGHTER-GCS-01" class="tactical-input">
+              </div>
+
+              <div class="form-group">
+                <label>Lease Status:</label>
+                <div class="lease-status-pill" id="lease-status-display">OWNER (Simulation Lease Active)</div>
+              </div>
+
+              <div class="form-row">
+                <button id="btn-claim-lease" class="btn-secondary">Claim Control Lease</button>
+                <button id="btn-release-lease" class="btn-secondary">Release Control</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ======================================================= -->
+        <!-- SCREEN 9: EVENT HISTORY -->
+        <!-- ======================================================= -->
+        <section id="screen-history" class="screen-view">
+          <div class="view-header">
+            <div>
+              <h2>Mission Event & Telemetry History</h2>
+              <p class="section-desc">Audit log recording every telemetry snapshot, fire detection, and pilot command.</p>
+            </div>
+            <div class="view-actions">
+              <button id="btn-clear-history" class="btn-secondary">Clear Log</button>
+              <button id="btn-export-log" class="btn-primary">Export CSV</button>
+            </div>
+          </div>
+
+          <div class="log-viewer" id="log-viewer">
+            <!-- Dynamically populated log entries -->
+          </div>
+        </section>
+
+        <!-- ======================================================= -->
+        <!-- SCREEN 10: ABOUT & INSTALLATION HELP -->
+        <!-- ======================================================= -->
+        <section id="screen-about" class="screen-view">
+          <div class="view-header">
+            <div>
+              <h2>About SKYFIGHTER & Zero-Cost Distribution</h2>
+              <p class="section-desc">Open-architecture forest fire detection drone system designed for 100% free distribution.</p>
+            </div>
+          </div>
+
+          <div class="about-container">
+            <div class="about-card hero-about">
+              <img src="./icons/icon-192.png" alt="Skyfighter Brand Logo" class="about-hero-img">
+              <div class="about-hero-text">
+                <h3>SKYFIGHTER Autonomous Forest Fire UAV</h3>
+                <p>Designed to save lives, prevent catastrophic wildfire spread, and provide volunteer first responders with accessible drone surveillance technology without commercial licensing fees.</p>
+              </div>
+            </div>
+
+            <div class="platform-guides-grid">
+              
+              <!-- iPhone / iPad Guide -->
+              <div class="guide-card">
+                <div class="guide-icon">📱</div>
+                <h4>iPhone & iPad Installation</h4>
+                <div class="guide-badge">Zero Developer Fee PWA</div>
+                <p>Apple restricts direct IPA file installation without a paid developer account. SKYFIGHTER is built as a certified Progressive Web App:</p>
+                <ol class="guide-steps">
+                  <li>Open this application in <strong>Safari</strong> on your iPhone or iPad.</li>
+                  <li>Tap the <strong>Share</strong> button at the bottom of the screen (square with arrow).</li>
+                  <li>Scroll down and tap <strong>"Add to Home Screen"</strong>.</li>
+                  <li>Tap <strong>Add</strong>. SKYFIGHTER will launch full-screen with offline capabilities!</li>
+                </ol>
+              </div>
+
+              <!-- Android Guide -->
+              <div class="guide-card">
+                <div class="guide-icon">🤖</div>
+                <h4>Android Phones & Tablets</h4>
+                <div class="guide-badge">Direct Install / PWA / APK</div>
+                <p>No Google Play store account needed:</p>
+                <ol class="guide-steps">
+                  <li>In <strong>Chrome</strong>, tap the browser menu (three dots).</li>
+                  <li>Select <strong>"Install app"</strong> or <strong>"Add to Home screen"</strong>.</li>
+                  <li>The app installs as a native standalone application icon on your launcher.</li>
+                  <li>For native APK builds, enable <em>"Install unknown apps"</em> in Android Settings.</li>
+                </ol>
+              </div>
+
+              <!-- Windows Guide -->
+              <div class="guide-card">
+                <div class="guide-icon">🪟</div>
+                <h4>Windows Desktop & Laptops</h4>
+                <div class="guide-badge">Edge / Chrome App</div>
+                <p>Install directly as a high-performance Windows desktop application:</p>
+                <ol class="guide-steps">
+                  <li>Open this page in <strong>Google Chrome</strong> or <strong>Microsoft Edge</strong>.</li>
+                  <li>Click the <strong>Install icon</strong> in the right side of the address bar.</li>
+                  <li>Confirm <strong>"Install"</strong> to add SKYFIGHTER to your Windows Start Menu and Desktop.</li>
+                  <li>Connect to the drone's Wi-Fi network (<code>SKYFIGHTER_GATEWAY</code>).</li>
+                </ol>
+              </div>
+
+              <!-- macOS Guide -->
+              <div class="guide-card">
+                <div class="guide-icon">💻</div>
+                <h4>macOS Desktop & MacBooks</h4>
+                <div class="guide-badge">Safari / Chrome Web App / Swift</div>
+                <p>Distributable without Apple Notarization fees:</p>
+                <ol class="guide-steps">
+                  <li>In <strong>Safari</strong> (macOS Sonoma / Sequoia), click <strong>File &gt; Add to Dock...</strong>.</li>
+                  <li>The app will run in its own dedicated sandboxed window like a native Mac application.</li>
+                  <li>Alternatively, build the native Swift app via Xcode with your free Personal Apple ID.</li>
+                </ol>
+              </div>
+
+            </div>
+
+            <div class="safety-declaration-card">
+              <h4>⚠️ Hardware Safety & Legal Notice</h4>
+              <p>SKYFIGHTER ground station software issues safety instructions over Wi-Fi. However, physical motor cutoffs, battery failsafes, and obstacle avoidance depend entirely on onboard firmware stability. Always operate within visual line of sight (VLOS) and comply with local aviation authority regulations.</p>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+
+    <!-- MOBILE BOTTOM NAVIGATION BAR -->
+    <nav class="mobile-tab-bar" id="mobile-tab-bar" aria-label="Mobile Navigation">
+      <button class="tab-btn active" data-screen="dashboard">
+        <span class="tab-icon">📊</span>
+        <span class="tab-label">Dash</span>
+      </button>
+      <button class="tab-btn" data-screen="livecam">
+        <span class="tab-icon">📹</span>
+        <span class="tab-label">RGB</span>
+      </button>
+      <button class="tab-btn" data-screen="thermal">
+        <span class="tab-icon">🔥</span>
+        <span class="tab-label">Thermal</span>
+      </button>
+      <button class="tab-btn" data-screen="map">
+        <span class="tab-icon">🗺️</span>
+        <span class="tab-label">Map</span>
+      </button>
+      <button class="tab-btn" data-screen="alerts">
+        <span class="tab-icon">🚨</span>
+        <span class="tab-label">Alerts</span>
+      </button>
+      <button class="tab-btn" data-screen="flight">
+        <span class="tab-icon">🕹️</span>
+        <span class="tab-label">Control</span>
+      </button>
+      <button class="tab-btn" data-screen="about">
+        <span class="tab-icon">ℹ️</span>
+        <span class="tab-label">About</span>
+      </button>
+    </nav>
+
+    <!-- ARMING SAFETY MODAL -->
+    <div id="modal-arming" class="modal-backdrop hidden">
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <h3>⚠️ TWO-STEP FLIGHT ARMING SAFETY CHECK</h3>
+          <button id="btn-close-arming-modal" class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-warning">
+            Arming enables motor commanding. Physical ESC signals are locked out in this release, but please verify pre-flight conditions:
+          </p>
+          <div class="checklist">
+            <label class="check-item">
+              <input type="checkbox" id="check-propellers"> Propellers clear of personnel and obstacles
+            </label>
+            <label class="check-item">
+              <input type="checkbox" id="check-gps"> GPS 3D fix verified outdoors with &gt; 6 satellites
+            </label>
+            <label class="check-item">
+              <input type="checkbox" id="check-throttle"> Throttle collective stick confirmed at 0%
+            </label>
+          </div>
+
+          <div class="slide-to-arm-container">
+            <div class="slide-track" id="slide-track">
+              <div class="slide-thumb" id="slide-thumb">▶</div>
+              <span class="slide-text">SLIDE TO ARM DRONE</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- APPLICATION ENGINE JAVASCRIPT -->
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

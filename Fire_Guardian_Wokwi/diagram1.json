@@ -1,0 +1,144 @@
+{
+  "version": 1,
+  "author": "Fire Guardian Team",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "wokwi-esp32-devkit-v1",
+      "id": "esp",
+      "top": -10,
+      "left": 20,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-dht22",
+      "id": "dht",
+      "top": -5,
+      "left": 300,
+      "attrs": {
+        "temperature": "24",
+        "humidity": "40"
+      }
+    },
+    {
+      "type": "wokwi-potentiometer",
+      "id": "mq2",
+      "top": 190,
+      "left": 300,
+      "attrs": {
+        "value": "300"
+      }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "flame",
+      "top": 190,
+      "left": 30,
+      "attrs": {
+        "color": "red",
+        "label": "FLAME"
+      }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led",
+      "top": 180,
+      "left": 580,
+      "attrs": {
+        "color": "red",
+        "label": "ALERT"
+      }
+    },
+    {
+      "type": "wokwi-buzzer",
+      "id": "buzz",
+      "top": 260,
+      "left": 560,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-relay-module",
+      "id": "relay",
+      "top": 330,
+      "left": 300,
+      "attrs": {}
+    }
+  ],
+  "connections": [
+    [
+      "esp:3V3",
+      "dht:VCC",
+      "red"
+    ],
+    [
+      "esp:GND.1",
+      "dht:GND",
+      "black"
+    ],
+    [
+      "esp:15",
+      "dht:SDA",
+      "green"
+    ],
+    [
+      "esp:34",
+      "mq2:SIG",
+      "green"
+    ],
+    [
+      "esp:3V3",
+      "mq2:VCC",
+      "red"
+    ],
+    [
+      "esp:GND.1",
+      "mq2:GND",
+      "black"
+    ],
+    [
+      "esp:27",
+      "flame:1.l",
+      "green"
+    ],
+    [
+      "esp:GND.2",
+      "flame:2.r",
+      "black"
+    ],
+    [
+      "esp:2",
+      "led:A",
+      "green"
+    ],
+    [
+      "esp:GND.2",
+      "led:C",
+      "black"
+    ],
+    [
+      "esp:25",
+      "buzz:1",
+      "green"
+    ],
+    [
+      "esp:GND.2",
+      "buzz:2",
+      "black"
+    ],
+    [
+      "esp:26",
+      "relay:IN",
+      "green"
+    ],
+    [
+      "esp:5V",
+      "relay:VCC",
+      "red"
+    ],
+    [
+      "esp:GND.2",
+      "relay:GND",
+      "black"
+    ]
+  ]
+}
