@@ -18,15 +18,15 @@ import {
 // ========================================================
 const state = {
   activeScreen: 'dashboard',
-  isSimulation: true,
-  isConnected: true,
+  isSimulation: false, // Default FALSE: wait until real drone connects via Wi-Fi
+  isConnected: false,  // Default FALSE: wait for live telemetry packets
   isArmed: false,
   isAudioMuted: false,
   telemetryAgeMs: 0,
-  lastTelemetryTimestamp: Date.now(),
+  lastTelemetryTimestamp: 0,
   commandSequence: 1,
   clientId: 'SKYFIGHTER-GCS-01',
-  activeScenario: 'fire_smoke',
+  activeScenario: 'clear_forest',
   showAiBoxes: true,
   aiConfidenceThreshold: 0.75,
   thermalPalette: 'ironbow',
@@ -40,13 +40,13 @@ const state = {
     throttle: 0.0
   },
   
-  // Telemetry Snapshot
+  // Telemetry Snapshot (Standby: no fake observations)
   telemetry: {
     version: 1,
     type: 'telemetry',
-    sequence: 1,
-    timestamp_ms: Date.now(),
-    connection: 'simulated',
+    sequence: 0,
+    timestamp_ms: 0,
+    connection: 'waiting',
     flight: {
       mode: 'disarmed',
       armed: false,
@@ -57,46 +57,34 @@ const state = {
         thermal_camera: true,
         rgb_camera: true,
         buzzer: true,
-        simulation_mode: true
+        simulation_mode: false
       }
     },
     sensors: {
-      temperature_c: 28.4,
-      humidity_pct: 46.5,
-      mq2_adc: 412,
-      flame_detected: false,
-      mpu_connected: true,
-      mpu_temperature_c: 31.4
+      temperature_c: null,
+      humidity_pct: null,
+      mq2_adc: null,
+      flame_detected: null,
+      mpu_connected: false,
+      mpu_temperature_c: null
     },
     gps: {
-      valid: true,
-      latitude: 12.971600,
-      longitude: 77.594600,
-      satellites: 9,
-      altitude_m: 24.5
+      valid: false,
+      latitude: null,
+      longitude: null,
+      satellites: 0,
+      altitude_m: null
     },
     battery: {
-      voltage_v: null, // Honest: unwired in hardware
+      voltage_v: null, // Unwired in physical hardware
       percentage: null
     },
     alerts: [],
     ai_detections: []
   },
   
-  // Incident queue
-  incidents: [
-    {
-      id: 'INC-101',
-      timestamp_ms: Date.now() - 32000,
-      timeStr: new Date(Date.now() - 32000).toLocaleTimeString(),
-      severity: 'warning',
-      source: 'MQ-2 Smoke Sensor',
-      type: 'Smoke Plume Detected',
-      coords: '12.972100, 77.595200',
-      status: 'potential',
-      maxTempC: 68.4
-    }
-  ],
+  // Incident queue: empty on startup (no fake fires)
+  incidents: [],
   
   // Event history log
   eventLog: []
@@ -111,6 +99,7 @@ leaseManager.claimLease(state.clientId);
 // Web Audio API context fallback
 let audioCtx = null;
 let webSocket = null;
+let reconnectTimer = null;
 
 // ========================================================
 // INITIALIZATION
@@ -123,7 +112,10 @@ document.addEventListener('DOMContentLoaded', () => {
   initFlightControls();
   initAudio();
   initSettings();
-  logEvent('SYSTEM', 'SKYFIGHTER GCS v1.1 initialized in Simulation Mode.');
+  initSerialConnection();
+  initAutoConnect();
+  renderTelemetryUI();
+  logEvent('SYSTEM', 'SKYFIGHTER GCS v1.1 initialized. Standby mode active — waiting for drone connection.');
 });
 
 // Register Progressive Web App Service Worker
@@ -177,6 +169,47 @@ function initNavigation() {
   const btnDashViewAll = document.getElementById('btn-dash-view-all');
   if (btnDashViewAll) {
     btnDashViewAll.addEventListener('click', () => switchScreen('alerts'));
+  }
+
+  // Quick triage button in hazard banner -> Connection screen
+  const btnQuickTriage = document.getElementById('btn-quick-triage');
+  if (btnQuickTriage) {
+    btnQuickTriage.addEventListener('click', () => switchScreen('connection'));
+  }
+
+  // Header Demo / Simulation Toggle Button
+  const btnSimToggle = document.getElementById('btn-sim-toggle');
+  if (btnSimToggle) {
+    btnSimToggle.addEventListener('click', () => {
+      state.isSimulation = !state.isSimulation;
+      const selMode = document.getElementById('conn-mode-select');
+      if (selMode) {
+        selMode.value = state.isSimulation ? 'simulation' : 'websocket';
+      }
+      if (state.isSimulation) {
+        logEvent('SYSTEM', 'Demo Simulation Mode manually ENABLED by pilot.');
+      } else {
+        logEvent('SYSTEM', 'Demo Simulation Mode DISABLED. Awaiting live drone Wi-Fi telemetry.');
+        if (!state.isConnected) {
+          state.telemetry.sensors = {
+            temperature_c: null,
+            humidity_pct: null,
+            mq2_adc: null,
+            flame_detected: null,
+            mpu_connected: false,
+            mpu_temperature_c: null
+          };
+          state.telemetry.gps = {
+            valid: false,
+            latitude: null,
+            longitude: null,
+            satellites: 0,
+            altitude_m: null
+          };
+        }
+      }
+      renderTelemetryUI();
+    });
   }
 }
 
@@ -291,6 +324,8 @@ function updateSimulatedTelemetry() {
 }
 
 function maybeRecordIncident(hazard, lat, lon, temp) {
+  // Only record incidents if connected to live drone or simulation is manually enabled
+  if (!state.isConnected && !state.isSimulation) return;
   const lastInc = state.incidents[0];
   const now = Date.now();
   if (!lastInc || (now - lastInc.timestamp_ms) > 15000) {
@@ -320,34 +355,214 @@ function renderTelemetryUI() {
   const g = t.gps;
   const f = t.flight;
 
-  // Header status pills
+  const isLive = state.isConnected;
+  const isSim = state.isSimulation;
+
+  const connPill = document.getElementById('conn-pill');
+  const connLabel = document.getElementById('conn-label');
   const armedPill = document.getElementById('armed-pill');
   const armedLabel = document.getElementById('armed-label');
-  if (armedPill && armedLabel) {
-    armedPill.className = `status-pill ${f.armed ? 'status-armed' : 'status-disarmed'}`;
-    armedLabel.textContent = f.armed ? 'ARMED (SIM)' : 'DISARMED';
+  const gpsPill = document.getElementById('gps-pill');
+  const gpsLabel = document.getElementById('gps-label');
+  const simBadge = document.getElementById('sim-badge');
+  const simToggleBtn = document.getElementById('btn-sim-toggle');
+  const simToggleLabel = document.getElementById('sim-toggle-label');
+  const latencyEl = document.getElementById('latency-text');
+
+  // Update sim toggle button text & style
+  if (simToggleLabel) {
+    simToggleLabel.textContent = isSim ? 'Demo: ON' : 'Demo: OFF';
+  }
+  if (simToggleBtn) {
+    simToggleBtn.classList.toggle('active', isSim);
   }
 
-  // Dashboard values
-  setElemText('val-temp', s.temperature_c !== null ? `${s.temperature_c} ` : 'UNAVAILABLE');
-  setElemText('val-humidity', s.humidity_pct !== null ? `${s.humidity_pct} ` : 'UNAVAILABLE');
-  setElemText('val-smoke', s.mq2_adc !== null ? `${s.mq2_adc} ` : 'UNAVAILABLE');
-  
-  const valFlame = document.getElementById('val-flame');
-  if (valFlame) {
-    if (s.flame_detected === true) {
-      valFlame.textContent = 'ACTIVE FLAME!';
-      valFlame.className = 'metric-value flame-alert';
-    } else if (s.flame_detected === false) {
-      valFlame.textContent = 'CLEAR';
-      valFlame.className = 'metric-value flame-safe';
+  if (!isLive && !isSim) {
+    // ----------------------------------------------------
+    // STANDBY DISCONNECTED STATE (Drone not connected)
+    // ----------------------------------------------------
+    if (connPill && connLabel) {
+      connPill.className = 'status-pill status-disconnected';
+      connLabel.textContent = 'NOT CONNECTED';
+    }
+    if (armedPill && armedLabel) {
+      armedPill.className = 'status-pill status-disarmed';
+      armedLabel.textContent = 'DISCONNECTED';
+    }
+    if (gpsPill && gpsLabel) {
+      gpsPill.className = 'status-pill status-disarmed';
+      gpsLabel.textContent = 'GPS: OFFLINE';
+    }
+    if (simBadge) {
+      simBadge.textContent = 'DRONE NOT CONNECTED';
+      simBadge.className = 'sim-pill disconnected';
+    }
+    if (latencyEl) {
+      latencyEl.textContent = 'LINK: DISCONNECTED (192.168.4.1)';
+    }
+
+    // Dashboard values: disconnected placeholders
+    setElemText('val-temp', '-- °C');
+    setElemStyle('bar-temp', 'width', '0%');
+    setElemText('sub-temp', 'Drone not connected');
+
+    setElemText('val-humidity', '-- %');
+    setElemStyle('bar-humidity', 'width', '0%');
+    setElemText('sub-humidity', 'Drone not connected');
+
+    setElemText('val-smoke', '-- ADC');
+    setElemStyle('bar-smoke', 'width', '0%');
+    setElemText('sub-smoke', 'Drone not connected');
+
+    const valFlame = document.getElementById('val-flame');
+    if (valFlame) {
+      valFlame.textContent = 'NOT CONNECTED';
+      valFlame.className = 'metric-value text-dim';
+    }
+    setElemText('sub-flame', 'Sensor offline');
+
+    setElemText('val-attitude', 'NOT CONNECTED');
+    setElemText('sub-mpu', 'IMU offline');
+
+    setElemText('val-coords', 'NOT CONNECTED');
+    setElemText('sub-gps', 'GPS offline');
+
+    // Standby Hazard Banner
+    const banner = document.getElementById('dashboard-hazard-banner');
+    const hTitle = document.getElementById('hazard-title');
+    const hDesc = document.getElementById('hazard-desc');
+    const hIcon = document.getElementById('hazard-icon');
+    if (banner && hTitle && hDesc && hIcon) {
+      banner.className = 'hazard-banner banner-disconnected';
+      hTitle.textContent = 'DRONE NOT CONNECTED';
+      hDesc.textContent = 'No live telemetry stream detected. Connect device to drone Wi-Fi (SKYFIGHTER_GATEWAY) or connect via USB. Real sensor data will appear once connected.';
+      hIcon.textContent = '📡';
+    }
+
+    // Map Standby Readouts
+    setElemText('map-lat', '--');
+    setElemText('map-lon', '--');
+    setElemText('map-alt', '--');
+    setElemText('map-sats', 'GPS Offline');
+    setElemText('map-drone-pos', 'DRONE: NOT CONNECTED');
+
+    // Diagnostics Standby Readouts
+    setElemText('diag-accel', '-- / -- / --');
+    setElemText('diag-gyro', '-- / -- / --');
+    setElemText('diag-mpu-temp', '-- °C');
+    setElemText('diag-mpu-ack', 'Drone not connected');
+    setElemClass('badge-mpu', 'diag-badge-warn');
+    setElemText('badge-mpu', 'OFFLINE');
+
+    setElemText('diag-dht-temp', '-- °C');
+    setElemText('diag-dht-humidity', '-- %');
+    setElemText('diag-dht-valid', 'Drone not connected');
+    setElemClass('badge-dht', 'diag-badge-warn');
+    setElemText('badge-dht', 'OFFLINE');
+
+    setElemText('diag-mq2-raw', '-- / 4095');
+    setElemText('diag-mq2-base', '--');
+    setElemText('diag-mq2-delta', 'Drone not connected');
+    setElemClass('badge-mq2', 'diag-badge-warn');
+    setElemText('badge-mq2', 'OFFLINE');
+
+    setElemText('diag-flame-pin', 'Offline');
+    setElemText('diag-flame-status', 'NOT CONNECTED');
+    setElemClass('badge-flame', 'diag-badge-warn');
+    setElemText('badge-flame', 'OFFLINE');
+
+    setElemText('diag-gps-sats', '--');
+    setElemText('diag-gps-age', '--');
+    setElemClass('badge-gps', 'diag-badge-warn');
+    setElemText('badge-gps', 'OFFLINE');
+
+    // Clear any fake incidents when disconnected
+    state.incidents = [];
+    updateAlertCounter();
+    renderIncidentsTable();
+    return;
+  }
+
+  // ----------------------------------------------------
+  // ACTIVE STATE (Connected to Drone or Demo Simulation)
+  // ----------------------------------------------------
+  if (connPill && connLabel) {
+    if (isLive) {
+      connPill.className = 'status-pill status-connected';
+      connLabel.textContent = 'CONNECTED (ESP32)';
     } else {
-      valFlame.textContent = 'UNAVAILABLE';
-      valFlame.className = 'metric-value';
+      connPill.className = 'status-pill status-simulated';
+      connLabel.textContent = 'SIMULATION ACTIVE';
     }
   }
 
-  if (g.valid && g.latitude !== null && g.longitude !== null) {
+  if (simBadge) {
+    simBadge.textContent = isSim ? 'DEMO SIMULATION' : 'LIVE DRONE LINK';
+    simBadge.className = isSim ? 'sim-pill active' : 'sim-pill';
+  }
+
+  if (armedPill && armedLabel) {
+    armedPill.className = `status-pill ${f.armed ? 'status-armed' : 'status-disarmed'}`;
+    armedLabel.textContent = f.armed ? (isSim ? 'ARMED (SIM)' : 'ARMED') : 'DISARMED';
+  }
+
+  // Temperature
+  if (s && s.temperature_c !== null) {
+    setElemText('val-temp', `${s.temperature_c} °C`);
+    const tPct = Math.min(100, Math.max(0, (s.temperature_c / 60) * 100));
+    setElemStyle('bar-temp', 'width', `${tPct}%`);
+    setElemText('sub-temp', s.temperature_c > 45 ? 'Elevated ambient heat' : 'Nominal canopy temperature');
+  } else {
+    setElemText('val-temp', '-- °C');
+    setElemStyle('bar-temp', 'width', '0%');
+  }
+
+  // Humidity
+  if (s && s.humidity_pct !== null) {
+    setElemText('val-humidity', `${s.humidity_pct} %`);
+    const hPct = Math.min(100, Math.max(0, s.humidity_pct));
+    setElemStyle('bar-humidity', 'width', `${hPct}%`);
+    setElemText('sub-humidity', s.humidity_pct < 30 ? 'Dry fuel condition (<30%)' : 'Nominal relative humidity');
+  } else {
+    setElemText('val-humidity', '-- %');
+    setElemStyle('bar-humidity', 'width', '0%');
+  }
+
+  // Smoke / MQ-2
+  if (s && s.mq2_adc !== null) {
+    setElemText('val-smoke', `${s.mq2_adc} ADC`);
+    const sPct = Math.min(100, Math.max(0, (s.mq2_adc / 4095) * 100));
+    setElemStyle('bar-smoke', 'width', `${sPct}%`);
+    setElemText('sub-smoke', s.mq2_adc > 900 ? 'High combustion gas level!' : 'Clean air baseline');
+  } else {
+    setElemText('val-smoke', '-- ADC');
+    setElemStyle('bar-smoke', 'width', '0%');
+  }
+
+  // Flame
+  const valFlame = document.getElementById('val-flame');
+  if (valFlame) {
+    if (s && s.flame_detected === true) {
+      valFlame.textContent = 'ACTIVE FLAME!';
+      valFlame.className = 'metric-value flame-alert';
+      setElemText('sub-flame', 'Optical IR wavelength triggered');
+    } else if (s && s.flame_detected === false) {
+      valFlame.textContent = 'CLEAR';
+      valFlame.className = 'metric-value flame-safe';
+      setElemText('sub-flame', 'No optical flame detected');
+    } else {
+      valFlame.textContent = 'WAITING';
+      valFlame.className = 'metric-value text-dim';
+      setElemText('sub-flame', 'Awaiting optical sensor packet...');
+    }
+  }
+
+  // IMU Attitude
+  setElemText('val-attitude', s && s.mpu_connected ? 'CALIBRATED' : 'OFFLINE');
+  setElemText('sub-mpu', s && s.mpu_connected ? `Chip Temp: ${s.mpu_temperature_c ? s.mpu_temperature_c.toFixed(1) : 31.4}°C` : 'Check I2C 0x68 bus');
+
+  // GPS
+  if (g && g.valid && g.latitude !== null && g.longitude !== null) {
     setElemText('val-coords', `${g.latitude.toFixed(6)}, ${g.longitude.toFixed(6)}`);
     setElemText('sub-gps', `Alt: ${g.altitude_m}m | Sats: ${g.satellites}`);
     setElemText('map-lat', `${g.latitude.toFixed(6)}°`);
@@ -355,18 +570,26 @@ function renderTelemetryUI() {
     setElemText('map-alt', `${g.altitude_m} m`);
     setElemText('map-sats', `${g.satellites} Locked (3D Fix)`);
     setElemText('map-drone-pos', `DRONE: ${g.latitude.toFixed(6)} N, ${g.longitude.toFixed(6)} E`);
+    if (gpsPill && gpsLabel) {
+      gpsPill.className = 'status-pill status-armed';
+      gpsLabel.textContent = `GPS: 3D FIX (${g.satellites})`;
+    }
   } else {
     setElemText('val-coords', 'NO GPS FIX');
     setElemText('sub-gps', 'Antenna outdoors required');
+    if (gpsPill && gpsLabel) {
+      gpsPill.className = 'status-pill status-disarmed';
+      gpsLabel.textContent = 'GPS: NO FIX';
+    }
   }
 
-  // Hazard banner
-  const hazard = evaluateCompositeHazard(s, state.isConnected, false);
+  // Hazard banner evaluation
+  const hazard = evaluateCompositeHazard(s, isLive || isSim, false);
   const banner = document.getElementById('dashboard-hazard-banner');
   const hTitle = document.getElementById('hazard-title');
   const hDesc = document.getElementById('hazard-desc');
   const hIcon = document.getElementById('hazard-icon');
-  
+
   if (banner && hTitle && hDesc && hIcon) {
     banner.className = `hazard-banner banner-${hazard.severity === 'critical' ? 'critical' : (hazard.severity === 'warning' ? 'warning' : 'normal')}`;
     hTitle.textContent = hazard.state.replace(/_/g, ' ');
@@ -374,11 +597,35 @@ function renderTelemetryUI() {
     hIcon.textContent = hazard.severity === 'critical' ? '🔥' : (hazard.severity === 'warning' ? '⚠️' : '🛡️');
   }
 
-  // Diagnostics page updates
-  setElemText('diag-dht-temp', s.temperature_c !== null ? `${s.temperature_c} °C` : 'READ ERROR');
-  setElemText('diag-dht-humidity', s.humidity_pct !== null ? `${s.humidity_pct} %` : 'READ ERROR');
-  setElemText('diag-mq2-raw', s.mq2_adc !== null ? `${s.mq2_adc} / 4095` : 'OFFLINE');
-  setElemText('diag-flame-pin', s.flame_detected ? 'LOW (TRIGGERED)' : 'HIGH (Inactive)');
+  // Diagnostics screen updates
+  setElemText('diag-accel', s && s.mpu_connected ? '0.01g / 0.02g / 0.98g' : '-- / -- / --');
+  setElemText('diag-gyro', s && s.mpu_connected ? '0.12°/s / -0.05°/s / 0.00°/s' : '-- / -- / --');
+  setElemText('diag-mpu-temp', s && s.mpu_temperature_c !== null ? `${s.mpu_temperature_c.toFixed(1)} °C` : '-- °C');
+  setElemText('diag-mpu-ack', s && s.mpu_connected ? '0x00 SUCCESS' : 'BUS ERROR');
+  setElemClass('badge-mpu', s && s.mpu_connected ? 'diag-badge-ok' : 'diag-badge-warn');
+  setElemText('badge-mpu', s && s.mpu_connected ? 'HEALTHY' : 'OFFLINE');
+
+  setElemText('diag-dht-temp', s && s.temperature_c !== null ? `${s.temperature_c} °C` : 'READ ERROR');
+  setElemText('diag-dht-humidity', s && s.humidity_pct !== null ? `${s.humidity_pct} %` : 'READ ERROR');
+  setElemText('diag-dht-valid', s && s.temperature_c !== null ? 'VALID' : 'CRC ERROR');
+  setElemClass('badge-dht', s && s.temperature_c !== null ? 'diag-badge-ok' : 'diag-badge-warn');
+  setElemText('badge-dht', s && s.temperature_c !== null ? 'HEALTHY' : 'OFFLINE');
+
+  setElemText('diag-mq2-raw', s && s.mq2_adc !== null ? `${s.mq2_adc} / 4095` : 'OFFLINE');
+  setElemText('diag-mq2-base', s && s.mq2_adc !== null ? '350' : '--');
+  setElemText('diag-mq2-delta', s && s.mq2_adc !== null ? `+${Math.max(0, s.mq2_adc - 350)} ADC` : '--');
+  setElemClass('badge-mq2', s && s.mq2_adc !== null ? 'diag-badge-ok' : 'diag-badge-warn');
+  setElemText('badge-mq2', s && s.mq2_adc !== null ? 'CALIBRATED' : 'OFFLINE');
+
+  setElemText('diag-flame-pin', s && s.flame_detected !== null ? (s.flame_detected ? 'LOW (TRIGGERED)' : 'HIGH (Inactive)') : 'OFFLINE');
+  setElemText('diag-flame-status', s && s.flame_detected ? 'FLAME DETECTED' : 'NO FLAME DETECTED');
+  setElemClass('badge-flame', s && s.flame_detected !== null ? 'diag-badge-ok' : 'diag-badge-warn');
+  setElemText('badge-flame', s && s.flame_detected !== null ? 'MONITORING' : 'OFFLINE');
+
+  setElemText('diag-gps-sats', g && g.satellites ? `${g.satellites}` : '0');
+  setElemText('diag-gps-age', g && g.valid ? '420 ms' : 'NO FIX');
+  setElemClass('badge-gps', g && g.valid ? 'diag-badge-ok' : 'diag-badge-warn');
+  setElemText('badge-gps', g && g.valid ? '3D FIX' : 'NO FIX');
 
   renderIncidentsTable();
 }
@@ -386,6 +633,16 @@ function renderTelemetryUI() {
 function setElemText(id, text) {
   const el = document.getElementById(id);
   if (el) el.textContent = text;
+}
+
+function setElemStyle(id, prop, val) {
+  const el = document.getElementById(id);
+  if (el) el.style[prop] = val;
+}
+
+function setElemClass(id, className) {
+  const el = document.getElementById(id);
+  if (el) el.className = className;
 }
 
 function updateAlertCounter() {
@@ -437,85 +694,161 @@ function initSimulatedCanvases() {
   function renderFrame() {
     tick += 0.05;
 
+    const isLive = state.isConnected;
+    const isSim = state.isSimulation;
+
+    // Helper: draw tactical standby HUD
+    function drawStandbyHUD(ctx, w, h, title, subtitle, info) {
+      ctx.fillStyle = '#070a12';
+      ctx.fillRect(0, 0, w, h);
+
+      // Subtle tactical grid
+      ctx.strokeStyle = 'rgba(0, 212, 255, 0.05)';
+      ctx.lineWidth = 1;
+      const step = 32;
+      for (let x = 0; x < w; x += step) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+      }
+      for (let y = 0; y < h; y += step) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+      }
+
+      const cx = w / 2;
+      const cy = h / 2 - 20;
+      const sweepR = 40;
+      const pulse = Math.sin(tick * 2) * 3;
+
+      // Outer sweep ring
+      ctx.strokeStyle = 'rgba(0, 212, 255, 0.25)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(cx, cy, sweepR + pulse, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Inner sweep ring
+      ctx.strokeStyle = 'rgba(0, 212, 255, 0.12)';
+      ctx.beginPath();
+      ctx.arc(cx, cy, sweepR * 0.5, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Rotating radar sweep
+      const angle = tick * 1.8;
+      ctx.strokeStyle = 'rgba(0, 212, 255, 0.5)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + Math.cos(angle) * (sweepR + pulse), cy + Math.sin(angle) * (sweepR + pulse));
+      ctx.stroke();
+
+      // Crosshairs
+      ctx.strokeStyle = 'rgba(0, 212, 255, 0.35)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(cx - sweepR - 12, cy); ctx.lineTo(cx - sweepR - 2, cy);
+      ctx.moveTo(cx + sweepR + 2, cy); ctx.lineTo(cx + sweepR + 12, cy);
+      ctx.moveTo(cx, cy - sweepR - 12); ctx.lineTo(cx, cy - sweepR - 2);
+      ctx.moveTo(cx, cy + sweepR + 2); ctx.lineTo(cx, cy + sweepR + 12);
+      ctx.stroke();
+
+      // Text labels
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#00d4ff';
+      ctx.font = 'bold 13px monospace';
+      ctx.fillText(title, cx, cy + sweepR + 30);
+
+      ctx.fillStyle = '#8a96aa';
+      ctx.font = '11px sans-serif';
+      ctx.fillText(subtitle, cx, cy + sweepR + 48);
+
+      ctx.fillStyle = 'rgba(255, 183, 3, 0.9)';
+      ctx.font = '10px monospace';
+      ctx.fillText(info, cx, cy + sweepR + 68);
+      ctx.textAlign = 'left';
+    }
+
     // 1. Render RGB Aerial Canopy View
     if (canvasRgb) {
       const ctx = canvasRgb.getContext('2d');
       const w = canvasRgb.width;
       const h = canvasRgb.height;
 
-      // Dark lush forest gradient
-      const bg = ctx.createLinearGradient(0, 0, w, h);
-      bg.addColorStop(0, '#0c1a12');
-      bg.addColorStop(1, '#08120d');
-      ctx.fillStyle = bg;
-      ctx.fillRect(0, 0, w, h);
+      if (!isLive && !isSim) {
+        drawStandbyHUD(ctx, w, h, 'AERIAL RGB CAMERA — STANDBY', 'Waiting for live video stream from drone Wi-Fi gateway', 'SSID: SKYFIGHTER_GATEWAY | ws://192.168.4.1:8080');
+      } else {
+        // Dark lush forest gradient
+        const bg = ctx.createLinearGradient(0, 0, w, h);
+        bg.addColorStop(0, '#0c1a12');
+        bg.addColorStop(1, '#08120d');
+        ctx.fillStyle = bg;
+        ctx.fillRect(0, 0, w, h);
 
-      // Draw stylized pine canopy textures
-      ctx.fillStyle = '#162e20';
-      for (let i = 0; i < 40; i++) {
-        const x = (Math.sin(i * 13 + tick * 0.05) * 0.5 + 0.5) * w;
-        const y = (Math.cos(i * 7 + tick * 0.05) * 0.5 + 0.5) * h;
-        ctx.beginPath();
-        ctx.arc(x, y, 16 + (i % 10), 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      // Draw wildfire smoke & flame if scenario active
-      if (state.activeScenario === 'fire_smoke' || state.activeScenario === 'smoke_plume') {
-        const fireX = w * 0.62;
-        const fireY = h * 0.45;
-
-        // Animated smoke plume
-        for (let j = 0; j < 12; j++) {
-          const plumeAge = (tick * 1.5 + j * 0.4) % 8;
-          const py = fireY - plumeAge * 28;
-          const px = fireX + Math.sin(plumeAge * 1.5) * 22;
-          const r = 20 + plumeAge * 14;
-
-          ctx.fillStyle = `rgba(180, 180, 180, ${Math.max(0, 0.4 - plumeAge * 0.05)})`;
+        // Draw stylized pine canopy textures
+        ctx.fillStyle = '#162e20';
+        for (let i = 0; i < 40; i++) {
+          const x = (Math.sin(i * 13 + tick * 0.05) * 0.5 + 0.5) * w;
+          const y = (Math.cos(i * 7 + tick * 0.05) * 0.5 + 0.5) * h;
           ctx.beginPath();
-          ctx.arc(px, py, r, 0, Math.PI * 2);
+          ctx.arc(x, y, 16 + (i % 10), 0, Math.PI * 2);
           ctx.fill();
         }
 
-        // Active flame glow
-        if (state.activeScenario === 'fire_smoke') {
-          const flameGlow = ctx.createRadialGradient(fireX, fireY, 5, fireX, fireY, 65);
-          flameGlow.addColorStop(0, '#ffffff');
-          flameGlow.addColorStop(0.3, '#ffaa00');
-          flameGlow.addColorStop(0.7, '#ff3b30');
-          flameGlow.addColorStop(1, 'rgba(255, 59, 48, 0)');
-          ctx.fillStyle = flameGlow;
-          ctx.beginPath();
-          ctx.arc(fireX, fireY, 65, 0, Math.PI * 2);
-          ctx.fill();
-        }
+        // Draw wildfire smoke & flame if scenario active
+        if (state.activeScenario === 'fire_smoke' || state.activeScenario === 'smoke_plume') {
+          const fireX = w * 0.62;
+          const fireY = h * 0.45;
 
-        // Render Edge AI Bounding Boxes matching diagram flow
-        if (state.showAiBoxes) {
-          // Fire Bounding Box
-          if (state.activeScenario === 'fire_smoke') {
-            ctx.strokeStyle = '#ff3b30';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(fireX - 45, fireY - 45, 90, 90);
+          // Animated smoke plume
+          for (let j = 0; j < 12; j++) {
+            const plumeAge = (tick * 1.5 + j * 0.4) % 8;
+            const py = fireY - plumeAge * 28;
+            const px = fireX + Math.sin(plumeAge * 1.5) * 22;
+            const r = 20 + plumeAge * 14;
 
-            ctx.fillStyle = 'rgba(255, 59, 48, 0.85)';
-            ctx.fillRect(fireX - 45, fireY - 70, 120, 22);
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 11px monospace';
-            ctx.fillText('FIRE: 0.94 (HIGH)', fireX - 40, fireY - 55);
+            ctx.fillStyle = `rgba(180, 180, 180, ${Math.max(0, 0.4 - plumeAge * 0.05)})`;
+            ctx.beginPath();
+            ctx.arc(px, py, r, 0, Math.PI * 2);
+            ctx.fill();
           }
 
-          // Smoke Bounding Box
-          ctx.strokeStyle = '#ffaa00';
-          ctx.lineWidth = 2;
-          ctx.strokeRect(fireX - 80, fireY - 140, 140, 100);
+          // Active flame glow
+          if (state.activeScenario === 'fire_smoke') {
+            const flameGlow = ctx.createRadialGradient(fireX, fireY, 5, fireX, fireY, 65);
+            flameGlow.addColorStop(0, '#ffffff');
+            flameGlow.addColorStop(0.3, '#ffaa00');
+            flameGlow.addColorStop(0.7, '#ff3b30');
+            flameGlow.addColorStop(1, 'rgba(255, 59, 48, 0)');
+            ctx.fillStyle = flameGlow;
+            ctx.beginPath();
+            ctx.arc(fireX, fireY, 65, 0, Math.PI * 2);
+            ctx.fill();
+          }
 
-          ctx.fillStyle = 'rgba(255, 170, 0, 0.85)';
-          ctx.fillRect(fireX - 80, fireY - 165, 130, 22);
-          ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 11px monospace';
-          ctx.fillText('SMOKE: 0.88 (PLUME)', fireX - 75, fireY - 150);
+          // Render Edge AI Bounding Boxes matching diagram flow
+          if (state.showAiBoxes) {
+            // Fire Bounding Box
+            if (state.activeScenario === 'fire_smoke') {
+              ctx.strokeStyle = '#ff3b30';
+              ctx.lineWidth = 2;
+              ctx.strokeRect(fireX - 45, fireY - 45, 90, 90);
+
+              ctx.fillStyle = 'rgba(255, 59, 48, 0.85)';
+              ctx.fillRect(fireX - 45, fireY - 70, 120, 22);
+              ctx.fillStyle = '#ffffff';
+              ctx.font = 'bold 11px monospace';
+              ctx.fillText('FIRE: 0.94 (HIGH)', fireX - 40, fireY - 55);
+            }
+
+            // Smoke Bounding Box
+            ctx.strokeStyle = '#ffaa00';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(fireX - 80, fireY - 140, 140, 100);
+
+            ctx.fillStyle = 'rgba(255, 170, 0, 0.85)';
+            ctx.fillRect(fireX - 80, fireY - 165, 130, 22);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 11px monospace';
+            ctx.fillText('SMOKE: 0.88 (PLUME)', fireX - 75, fireY - 150);
+          }
         }
       }
     }
@@ -526,38 +859,42 @@ function initSimulatedCanvases() {
       const tw = canvasThermal.width;
       const th = canvasThermal.height;
 
-      // Base cold ambient gradient
-      const tGrad = tCtx.createRadialGradient(tw / 2, th / 2, 50, tw / 2, th / 2, tw / 2);
-      tGrad.addColorStop(0, '#0a0a2e');
-      tGrad.addColorStop(1, '#020208');
-      tCtx.fillStyle = tGrad;
-      tCtx.fillRect(0, 0, tw, th);
+      if (!isLive && !isSim) {
+        drawStandbyHUD(tCtx, tw, th, 'THERMAL PYROMETRY — STANDBY', 'Dual-Band Radiometric IR Sensor Offline', 'Awaiting real temperature observations...');
+      } else {
+        // Base cold ambient gradient
+        const tGrad = tCtx.createRadialGradient(tw / 2, th / 2, 50, tw / 2, th / 2, tw / 2);
+        tGrad.addColorStop(0, '#0a0a2e');
+        tGrad.addColorStop(1, '#020208');
+        tCtx.fillStyle = tGrad;
+        tCtx.fillRect(0, 0, tw, th);
 
-      // Render thermal hotspot
-      if (state.activeScenario === 'fire_smoke' || state.activeScenario === 'high_heat') {
-        const hx = tw * 0.62;
-        const hy = th * 0.45;
-        const hRadius = state.activeScenario === 'fire_smoke' ? 90 : 50;
+        // Render thermal hotspot
+        if (state.activeScenario === 'fire_smoke' || state.activeScenario === 'high_heat') {
+          const hx = tw * 0.62;
+          const hy = th * 0.45;
+          const hRadius = state.activeScenario === 'fire_smoke' ? 90 : 50;
 
-        const hotspotGrad = tCtx.createRadialGradient(hx, hy, 4, hx, hy, hRadius);
-        hotspotGrad.addColorStop(0, '#ffffff'); // >350°C
-        hotspotGrad.addColorStop(0.2, '#ffff00'); // ~280°C
-        hotspotGrad.addColorStop(0.4, '#ff3b30'); // ~200°C
-        hotspotGrad.addColorStop(0.7, '#9d4edd'); // ~100°C
-        hotspotGrad.addColorStop(1, 'rgba(10, 10, 46, 0)');
+          const hotspotGrad = tCtx.createRadialGradient(hx, hy, 4, hx, hy, hRadius);
+          hotspotGrad.addColorStop(0, '#ffffff'); // >350°C
+          hotspotGrad.addColorStop(0.2, '#ffff00'); // ~280°C
+          hotspotGrad.addColorStop(0.4, '#ff3b30'); // ~200°C
+          hotspotGrad.addColorStop(0.7, '#9d4edd'); // ~100°C
+          hotspotGrad.addColorStop(1, 'rgba(10, 10, 46, 0)');
 
-        tCtx.fillStyle = hotspotGrad;
-        tCtx.beginPath();
-        tCtx.arc(hx, hy, hRadius, 0, Math.PI * 2);
-        tCtx.fill();
+          tCtx.fillStyle = hotspotGrad;
+          tCtx.beginPath();
+          tCtx.arc(hx, hy, hRadius, 0, Math.PI * 2);
+          tCtx.fill();
 
-        // Radiometric Spot Meter crosshair
-        tCtx.strokeStyle = '#ffffff';
-        tCtx.lineWidth = 1;
-        tCtx.strokeRect(hx - 20, hy - 20, 40, 40);
-        tCtx.fillStyle = '#ffffff';
-        tCtx.font = 'bold 12px monospace';
-        tCtx.fillText('HOTSPOT: 348.6°C', hx - 40, hy - 28);
+          // Radiometric Spot Meter crosshair
+          tCtx.strokeStyle = '#ffffff';
+          tCtx.lineWidth = 1;
+          tCtx.strokeRect(hx - 20, hy - 20, 40, 40);
+          tCtx.fillStyle = '#ffffff';
+          tCtx.font = 'bold 12px monospace';
+          tCtx.fillText('HOTSPOT: 348.6°C', hx - 40, hy - 28);
+        }
       }
     }
 
@@ -567,79 +904,83 @@ function initSimulatedCanvases() {
       const mw = canvasMap.width;
       const mh = canvasMap.height;
 
-      // Dark tactical map background with grid
-      mCtx.fillStyle = '#0a0f18';
-      mCtx.fillRect(0, 0, mw, mh);
+      if (!isLive && !isSim) {
+        drawStandbyHUD(mCtx, mw, mh, 'TACTICAL VECTOR MAP — STANDBY', 'Waiting for GPS telemetry from drone Wi-Fi', 'Antenna outdoors required for 3D fix');
+      } else {
+        // Dark tactical map background with grid
+        mCtx.fillStyle = '#0a0f18';
+        mCtx.fillRect(0, 0, mw, mh);
 
-      mCtx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-      mCtx.lineWidth = 1;
-      const gridSize = 40;
-      for (let x = 0; x < mw; x += gridSize) {
+        mCtx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+        mCtx.lineWidth = 1;
+        const gridSize = 40;
+        for (let x = 0; x < mw; x += gridSize) {
+          mCtx.beginPath();
+          mCtx.moveTo(x, 0);
+          mCtx.lineTo(x, mh);
+          mCtx.stroke();
+        }
+        for (let y = 0; y < mh; y += gridSize) {
+          mCtx.beginPath();
+          mCtx.moveTo(0, y);
+          mCtx.lineTo(mw, y);
+          mCtx.stroke();
+        }
+
+        // Home base coordinates marker
+        const homeX = mw * 0.3;
+        const homeY = mh * 0.7;
+        mCtx.fillStyle = '#00f076';
         mCtx.beginPath();
-        mCtx.moveTo(x, 0);
-        mCtx.lineTo(x, mh);
-        mCtx.stroke();
-      }
-      for (let y = 0; y < mh; y += gridSize) {
+        mCtx.arc(homeX, homeY, 6, 0, Math.PI * 2);
+        mCtx.fill();
+        mCtx.fillStyle = '#8a96aa';
+        mCtx.font = '10px monospace';
+        mCtx.fillText('HOME BASE (PILOT)', homeX + 10, homeY + 4);
+
+        // Drone Position & Heading Cone
+        const droneX = mw * 0.52 + Math.sin(tick * 0.2) * 20;
+        const droneY = mh * 0.48 + Math.cos(tick * 0.2) * 15;
+
+        // Heading cone
+        mCtx.fillStyle = 'rgba(0, 229, 255, 0.15)';
         mCtx.beginPath();
-        mCtx.moveTo(0, y);
-        mCtx.lineTo(mw, y);
-        mCtx.stroke();
-      }
-
-      // Home base coordinates marker
-      const homeX = mw * 0.3;
-      const homeY = mh * 0.7;
-      mCtx.fillStyle = '#00f076';
-      mCtx.beginPath();
-      mCtx.arc(homeX, homeY, 6, 0, Math.PI * 2);
-      mCtx.fill();
-      mCtx.fillStyle = '#8a96aa';
-      mCtx.font = '10px monospace';
-      mCtx.fillText('HOME BASE (PILOT)', homeX + 10, homeY + 4);
-
-      // Drone Position & Heading Cone
-      const droneX = mw * 0.52 + Math.sin(tick * 0.2) * 20;
-      const droneY = mh * 0.48 + Math.cos(tick * 0.2) * 15;
-
-      // Heading cone
-      mCtx.fillStyle = 'rgba(0, 229, 255, 0.15)';
-      mCtx.beginPath();
-      mCtx.moveTo(droneX, droneY);
-      mCtx.arc(droneX, droneY, 60, -0.6, 0.6);
-      mCtx.closePath();
-      mCtx.fill();
-
-      // Drone icon
-      mCtx.fillStyle = '#00e5ff';
-      mCtx.beginPath();
-      mCtx.moveTo(droneX, droneY - 10);
-      mCtx.lineTo(droneX + 8, droneY + 8);
-      mCtx.lineTo(droneX, droneY + 4);
-      mCtx.lineTo(droneX - 8, droneY + 8);
-      mCtx.closePath();
-      mCtx.fill();
-
-      // Pulsing Fire Incident Marker
-      if (state.activeScenario === 'fire_smoke') {
-        const fireMapX = mw * 0.7;
-        const fireMapY = mh * 0.35;
-        const pulseR = 12 + Math.sin(tick * 3) * 6;
-
-        mCtx.strokeStyle = 'rgba(255, 59, 48, 0.8)';
-        mCtx.lineWidth = 2;
-        mCtx.beginPath();
-        mCtx.arc(fireMapX, fireMapY, pulseR, 0, Math.PI * 2);
-        mCtx.stroke();
-
-        mCtx.fillStyle = '#ff3b30';
-        mCtx.beginPath();
-        mCtx.arc(fireMapX, fireMapY, 6, 0, Math.PI * 2);
+        mCtx.moveTo(droneX, droneY);
+        mCtx.arc(droneX, droneY, 60, -0.6, 0.6);
+        mCtx.closePath();
         mCtx.fill();
 
-        mCtx.fillStyle = '#ff6b00';
-        mCtx.font = 'bold 11px monospace';
-        mCtx.fillText('INCIDENT #101 [348°C]', fireMapX + 14, fireMapY + 4);
+        // Drone icon
+        mCtx.fillStyle = '#00e5ff';
+        mCtx.beginPath();
+        mCtx.moveTo(droneX, droneY - 10);
+        mCtx.lineTo(droneX + 8, droneY + 8);
+        mCtx.lineTo(droneX, droneY + 4);
+        mCtx.lineTo(droneX - 8, droneY + 8);
+        mCtx.closePath();
+        mCtx.fill();
+
+        // Pulsing Fire Incident Marker
+        if (state.activeScenario === 'fire_smoke') {
+          const fireMapX = mw * 0.7;
+          const fireMapY = mh * 0.35;
+          const pulseR = 12 + Math.sin(tick * 3) * 6;
+
+          mCtx.strokeStyle = 'rgba(255, 59, 48, 0.8)';
+          mCtx.lineWidth = 2;
+          mCtx.beginPath();
+          mCtx.arc(fireMapX, fireMapY, pulseR, 0, Math.PI * 2);
+          mCtx.stroke();
+
+          mCtx.fillStyle = '#ff3b30';
+          mCtx.beginPath();
+          mCtx.arc(fireMapX, fireMapY, 6, 0, Math.PI * 2);
+          mCtx.fill();
+
+          mCtx.fillStyle = '#ff6b00';
+          mCtx.font = 'bold 11px monospace';
+          mCtx.fillText('INCIDENT #101 [348°C]', fireMapX + 14, fireMapY + 4);
+        }
       }
     }
 
@@ -952,6 +1293,90 @@ function synthesizeBuzzerBeep() {
   }
 }
 
+function connectWebSocket(url) {
+  const wsStatus = document.getElementById('ws-status-msg');
+  const connPill = document.getElementById('conn-pill');
+  const connLabel = document.getElementById('conn-label');
+
+  try {
+    if (webSocket) {
+      webSocket.onopen = null;
+      webSocket.onmessage = null;
+      webSocket.onerror = null;
+      webSocket.onclose = null;
+      try { webSocket.close(); } catch (_) {}
+      webSocket = null;
+    }
+
+    if (wsStatus && (!webSocket || webSocket.readyState !== WebSocket.OPEN)) {
+      wsStatus.textContent = `Connecting to ${url}...`;
+    }
+
+    webSocket = new WebSocket(url);
+
+    webSocket.onopen = () => {
+      state.isConnected = true;
+      state.isSimulation = false;
+      if (wsStatus) wsStatus.textContent = `CONNECTED to ESP32 Gateway (${url})`;
+      if (connPill) connPill.className = 'status-pill status-connected';
+      if (connLabel) connLabel.textContent = 'CONNECTED (ESP32)';
+      logEvent('SYSTEM', `WebSocket link established with drone: ${url}`);
+      renderTelemetryUI();
+    };
+
+    webSocket.onmessage = (event) => {
+      try {
+        const parsed = parseIncomingPacket(event.data);
+        if (parsed && parsed.type === 'telemetry') {
+          state.telemetry = parsed;
+          state.lastTelemetryTimestamp = Date.now();
+          renderTelemetryUI();
+        }
+      } catch (err) {
+        console.warn('Failed to parse incoming telemetry packet:', err);
+      }
+    };
+
+    webSocket.onerror = () => {
+      // Handled silently during periodic auto-reconnect
+      if (wsStatus && !state.isConnected) {
+        wsStatus.textContent = `Awaiting drone Wi-Fi link at ${url}...`;
+      }
+    };
+
+    webSocket.onclose = () => {
+      if (state.isConnected) {
+        state.isConnected = false;
+        if (wsStatus) wsStatus.textContent = 'WebSocket disconnected. Awaiting drone Wi-Fi link...';
+        if (connPill) connPill.className = 'status-pill status-waiting';
+        if (connLabel) connLabel.textContent = 'WAITING FOR DRONE...';
+        logEvent('SYSTEM', 'WebSocket connection closed. Standby mode resumed.');
+        renderTelemetryUI();
+      }
+    };
+  } catch (err) {
+    if (wsStatus) wsStatus.textContent = `Connection error: ${err.message}`;
+  }
+}
+
+function initAutoConnect() {
+  const inputUrl = document.getElementById('input-ws-url');
+
+  function tryAutoConnect() {
+    // Only attempt if not already connected and not in demo simulation mode
+    if (state.isConnected || state.isSimulation) return;
+    const url = inputUrl ? inputUrl.value.trim() : 'ws://192.168.4.1:8080/telemetry';
+    connectWebSocket(url);
+  }
+
+  // Poll for drone gateway every 3.5 seconds
+  if (reconnectTimer) clearInterval(reconnectTimer);
+  reconnectTimer = setInterval(tryAutoConnect, 3500);
+
+  // Initial attempt after brief startup
+  setTimeout(tryAutoConnect, 800);
+}
+
 // ========================================================
 // SETTINGS & WEBSOCKET GATEWAY CONNECTION
 // ========================================================
@@ -961,65 +1386,38 @@ function initSettings() {
   const btnDisconnect = document.getElementById('btn-ws-disconnect');
   const inputUrl = document.getElementById('input-ws-url');
   const wsStatus = document.getElementById('ws-status-msg');
-  const connPill = document.getElementById('conn-pill');
-  const connLabel = document.getElementById('conn-label');
 
   if (selMode) {
     selMode.addEventListener('change', (e) => {
       state.isSimulation = e.target.value === 'simulation';
-      const simPill = document.getElementById('sim-badge');
-      if (simPill) simPill.classList.toggle('active', state.isSimulation);
+      if (!state.isSimulation && !state.isConnected) {
+        // Reset to standby
+        state.telemetry.sensors = {
+          temperature_c: null,
+          humidity_pct: null,
+          mq2_adc: null,
+          flame_detected: null,
+          mpu_connected: false,
+          mpu_temperature_c: null
+        };
+        state.telemetry.gps = {
+          valid: false,
+          latitude: null,
+          longitude: null,
+          satellites: 0,
+          altitude_m: null
+        };
+      }
       logEvent('SYSTEM', `Operation mode switched to: ${e.target.value}`);
+      renderTelemetryUI();
     });
   }
 
   if (btnConnect && inputUrl) {
     btnConnect.addEventListener('click', () => {
       const url = inputUrl.value.trim();
-      logEvent('SYSTEM', `Attempting WebSocket connection to ${url}...`);
-      if (wsStatus) wsStatus.textContent = `Connecting to ${url}...`;
-
-      try {
-        if (webSocket) webSocket.close();
-        webSocket = new WebSocket(url);
-
-        webSocket.onopen = () => {
-          state.isConnected = true;
-          state.isSimulation = false;
-          if (wsStatus) wsStatus.textContent = 'CONNECTED to ESP32 Gateway WebSocket.';
-          if (connPill) connPill.className = 'status-pill status-armed';
-          if (connLabel) connLabel.textContent = 'CONNECTED';
-          logEvent('SYSTEM', `WebSocket link established with ${url}`);
-        };
-
-        webSocket.onmessage = (event) => {
-          try {
-            const parsed = parseIncomingPacket(event.data);
-            if (parsed.type === 'telemetry') {
-              state.telemetry = parsed;
-              state.lastTelemetryTimestamp = Date.now();
-              renderTelemetryUI();
-            }
-          } catch (err) {
-            console.error('Failed to parse incoming telemetry packet:', err);
-          }
-        };
-
-        webSocket.onerror = (err) => {
-          if (wsStatus) wsStatus.textContent = 'WebSocket connection error. Check Wi-Fi SoftAP connection.';
-          logEvent('SYSTEM', `WebSocket error connecting to ${url}`);
-        };
-
-        webSocket.onclose = () => {
-          state.isConnected = false;
-          if (wsStatus) wsStatus.textContent = 'WebSocket disconnected.';
-          if (connPill) connPill.className = 'status-pill status-disarmed';
-          if (connLabel) connLabel.textContent = 'DISCONNECTED';
-          logEvent('SYSTEM', 'WebSocket connection closed.');
-        };
-      } catch (err) {
-        if (wsStatus) wsStatus.textContent = `Connection failed: ${err.message}`;
-      }
+      logEvent('SYSTEM', `Manual connection attempt to ${url}...`);
+      connectWebSocket(url);
     });
   }
 
@@ -1029,9 +1427,26 @@ function initSettings() {
         webSocket.close();
         webSocket = null;
       }
-      state.isSimulation = true;
-      if (wsStatus) wsStatus.textContent = 'Disconnected. Returned to Simulation Mode.';
+      state.isConnected = false;
+      state.isSimulation = false;
+      state.telemetry.sensors = {
+        temperature_c: null,
+        humidity_pct: null,
+        mq2_adc: null,
+        flame_detected: null,
+        mpu_connected: false,
+        mpu_temperature_c: null
+      };
+      state.telemetry.gps = {
+        valid: false,
+        latitude: null,
+        longitude: null,
+        satellites: 0,
+        altitude_m: null
+      };
+      if (wsStatus) wsStatus.textContent = 'Disconnected. Standby mode active (Awaiting drone Wi-Fi).';
       logEvent('SYSTEM', 'Manually disconnected from gateway.');
+      renderTelemetryUI();
     });
   }
 }
@@ -1094,4 +1509,213 @@ if (btnExportLog) {
     dlAnchor.click();
     logEvent('SYSTEM', 'Exported event log CSV');
   });
+}
+
+// ========================================================
+// DIRECT USB (WEB SERIAL) CONNECTION
+// ========================================================
+let serialPort = null;
+let serialReader = null;
+let serialKeepReading = false;
+
+function initSerialConnection() {
+  const btnConnect = document.getElementById('btn-serial-connect');
+  const btnDisconnect = document.getElementById('btn-serial-disconnect');
+
+  if (btnConnect) {
+    btnConnect.addEventListener('click', connectSerial);
+  }
+  if (btnDisconnect) {
+    btnDisconnect.addEventListener('click', disconnectSerial);
+  }
+}
+
+async function connectSerial() {
+  const wsStatus = document.getElementById('ws-status-msg');
+  const btnConnect = document.getElementById('btn-serial-connect');
+  const btnDisconnect = document.getElementById('btn-serial-disconnect');
+
+  if (!('serial' in navigator)) {
+    alert('Web Serial API is not supported in this browser.\nPlease use Google Chrome, Brave, Edge, or Opera on Mac/Windows/Linux, or use the Wi-Fi connection.');
+    return;
+  }
+
+  try {
+    serialPort = await navigator.serial.requestPort();
+    await serialPort.open({ baudRate: 115200 });
+
+    state.isConnected = true;
+    state.isSimulation = false;
+    serialKeepReading = true;
+
+    if (btnConnect) btnConnect.style.display = 'none';
+    if (btnDisconnect) btnDisconnect.style.display = 'inline-block';
+    if (wsStatus) wsStatus.textContent = 'CONNECTED via Direct USB Cable (115200 Baud)';
+
+    logEvent('SYSTEM', 'USB Serial link connected at 115200 baud.');
+    renderTelemetryUI();
+
+    readSerialStream();
+  } catch (err) {
+    console.error('USB Serial connection error:', err);
+    if (wsStatus) wsStatus.textContent = `USB Serial error: ${err.message}`;
+    logEvent('SYSTEM', `USB Serial link failed: ${err.message}`);
+  }
+}
+
+async function disconnectSerial() {
+  serialKeepReading = false;
+  if (serialReader) {
+    try {
+      await serialReader.cancel();
+      serialReader.releaseLock();
+    } catch (_) {}
+    serialReader = null;
+  }
+  if (serialPort) {
+    try {
+      await serialPort.close();
+    } catch (_) {}
+    serialPort = null;
+  }
+
+  const btnConnect = document.getElementById('btn-serial-connect');
+  const btnDisconnect = document.getElementById('btn-serial-disconnect');
+  const wsStatus = document.getElementById('ws-status-msg');
+
+  if (btnConnect) btnConnect.style.display = 'inline-block';
+  if (btnDisconnect) btnDisconnect.style.display = 'none';
+
+  state.isConnected = false;
+  state.isSimulation = false;
+  state.telemetry.sensors = {
+    temperature_c: null,
+    humidity_pct: null,
+    mq2_adc: null,
+    flame_detected: null,
+    mpu_connected: false,
+    mpu_temperature_c: null
+  };
+  state.telemetry.gps = {
+    valid: false,
+    latitude: null,
+    longitude: null,
+    satellites: 0,
+    altitude_m: null
+  };
+  if (wsStatus) wsStatus.textContent = 'USB Serial disconnected. Standby mode active.';
+  logEvent('SYSTEM', 'USB Serial link disconnected.');
+  renderTelemetryUI();
+}
+
+async function readSerialStream() {
+  const textDecoder = new TextDecoderStream();
+  serialPort.readable.pipeTo(textDecoder.writable).catch(() => {});
+  const reader = textDecoder.readable.getReader();
+  serialReader = reader;
+
+  let buffer = '';
+
+  try {
+    while (serialKeepReading) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      if (value) {
+        buffer += value;
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+
+        for (const line of lines) {
+          handleIncomingSerialLine(line.trim());
+        }
+      }
+    }
+  } catch (err) {
+    if (serialKeepReading) {
+      console.warn('Serial read error:', err);
+    }
+  } finally {
+    try { reader.releaseLock(); } catch (_) {}
+  }
+}
+
+function handleIncomingSerialLine(line) {
+  if (!line) return;
+
+  // 1. Structured JSON telemetry
+  if (line.startsWith('{') && line.endsWith('}')) {
+    try {
+      const parsed = parseIncomingPacket(line);
+      if (parsed && parsed.type === 'telemetry') {
+        state.telemetry = parsed;
+        state.isConnected = true;
+        state.isSimulation = false;
+        state.lastTelemetryTimestamp = Date.now();
+        renderTelemetryUI();
+        return;
+      }
+    } catch (_) {}
+  }
+
+  // 2. Parse text reports from sketch.ino
+  let updated = false;
+
+  if (line.includes('MQ-2 raw reading:')) {
+    const val = parseInt(line.split(':')[1]);
+    if (!isNaN(val)) {
+      state.telemetry.sensors.mq2_adc = val;
+      updated = true;
+    }
+  } else if (line.includes('Flame sensor DO:')) {
+    const val = line.split(':')[1].trim();
+    state.telemetry.sensors.flame_detected = (val === 'LOW');
+    updated = true;
+  } else if (line.includes('Flame warning:')) {
+    const val = line.split(':')[1].trim();
+    state.telemetry.sensors.flame_detected = (val === 'YES');
+    updated = true;
+  } else if (line.includes('Ambient temperature:')) {
+    if (line.includes('READ ERROR') || line.includes('NAN')) {
+      state.telemetry.sensors.temperature_c = null;
+    } else {
+      const num = parseFloat(line.split(':')[1]);
+      if (!isNaN(num)) state.telemetry.sensors.temperature_c = num;
+    }
+    updated = true;
+  } else if (line.includes('Humidity:')) {
+    if (line.includes('READ ERROR') || line.includes('NAN')) {
+      state.telemetry.sensors.humidity_pct = null;
+    } else {
+      const num = parseFloat(line.split(':')[1]);
+      if (!isNaN(num)) state.telemetry.sensors.humidity_pct = num;
+    }
+    updated = true;
+  } else if (line.includes('Latitude:')) {
+    const num = parseFloat(line.split(':')[1]);
+    if (!isNaN(num) && num !== 0) {
+      state.telemetry.gps.latitude = num;
+      state.telemetry.gps.valid = true;
+      updated = true;
+    }
+  } else if (line.includes('Longitude:')) {
+    const num = parseFloat(line.split(':')[1]);
+    if (!isNaN(num) && num !== 0) {
+      state.telemetry.gps.longitude = num;
+      updated = true;
+    }
+  } else if (line.includes('MPU6050: DETECTED')) {
+    state.telemetry.sensors.mpu_connected = true;
+    updated = true;
+  } else if (line.includes('MPU6050 chip temperature:')) {
+    const num = parseFloat(line.split(':')[1]);
+    if (!isNaN(num)) state.telemetry.sensors.mpu_temperature_c = num;
+    updated = true;
+  }
+
+  if (updated) {
+    state.isConnected = true;
+    state.isSimulation = false;
+    state.lastTelemetryTimestamp = Date.now();
+    renderTelemetryUI();
+  }
 }

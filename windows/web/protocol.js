@@ -67,9 +67,9 @@ export function validateTelemetryStructure(packet, maxAgeMs = TELEMETRY_LOST_MS)
     throw new ProtocolError('INVALID_TIMESTAMP', 'Telemetry packet missing valid timestamp_ms');
   }
 
-  // Stale check if now is provided/available
+  // Stale check only if timestamp is epoch milliseconds (not microcontroller millis() uptime)
   const now = Date.now();
-  if (now - packet.timestamp_ms > maxAgeMs) {
+  if (packet.timestamp_ms > 1000000000000 && (now - packet.timestamp_ms > maxAgeMs)) {
     throw new ProtocolError('STALE_DATA', `Telemetry packet timestamp is stale (${now - packet.timestamp_ms}ms old)`);
   }
 

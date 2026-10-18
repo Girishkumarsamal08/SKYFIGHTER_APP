@@ -66,11 +66,11 @@
 		72448C100198A2454A6607B0 /* FlightCommandValidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlightCommandValidator.swift; sourceTree = "<group>"; };
 		7782D325AA1F42F0848B4066 /* HardwareStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardwareStatus.swift; sourceTree = "<group>"; };
 		7BC1631B0BF05BECF1233EF1 /* TelemetryParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelemetryParser.swift; sourceTree = "<group>"; };
-		7DD2E80C9DB77652D95E672A /* SkyfighterApp.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = SkyfighterApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		7DD2E80C9DB77652D95E672A /* SkyfighterApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SkyfighterApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		875BEB9A6A6385BB3042F366 /* FireAlertView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FireAlertView.swift; sourceTree = "<group>"; };
 		8797E0409ADB2D4672ACA08D /* SkyfighterAppTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkyfighterAppTests.swift; sourceTree = "<group>"; };
 		8BC46F9CF9F0EEB25FE929F4 /* MissionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MissionService.swift; sourceTree = "<group>"; };
-		8C2224CBD3B014067964C141 /* SkyfighterAppTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SkyfighterAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		8C2224CBD3B014067964C141 /* SkyfighterAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SkyfighterAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		8EABA1149075A0A992A52A37 /* DroneConnectionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DroneConnectionManager.swift; sourceTree = "<group>"; };
 		93ABD3916469626225224FEA /* ThrottleSliderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThrottleSliderView.swift; sourceTree = "<group>"; };
 		958DA2DBEA6F3638F67CFC43 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
@@ -261,7 +261,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 1600;
+				LastUpgradeCheck = 2700;
 				TargetAttributes = {
 					05071B80EE125821C91FD464 = {
 						DevelopmentTeam = MV8SMV87FP;
@@ -460,6 +460,7 @@
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 6.0;
@@ -542,6 +543,7 @@
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 6.0;

@@ -11,6 +11,10 @@
   This is sensor-monitoring code, NOT flight-control software.
 */
 
+#include <Arduino.h>
+#if __has_include(<HardwareSerial.h>)
+#include <HardwareSerial.h>
+#endif
 #include <DHT.h>
 #include <Wire.h>
 
@@ -33,10 +37,16 @@
 // TEMPERATURE SENSOR CONFIGURATION
 // Choose ONE according to your actual sensor.
 // =====================================================
+#ifndef DHT11
+#define DHT11 11
+#endif
+#ifndef DHT22
+#define DHT22 22
+#endif
 
 #define DHT_TYPE DHT11
-// For a DHT11, change the line above to:
-// #define DHT_TYPE DHT11
+// For a DHT22, change the line above to:
+// #define DHT_TYPE DHT22
 
 DHT dht(DHT_PIN, DHT_TYPE);
 
@@ -143,6 +153,7 @@ bool readMPU6050() {
 
   ax = readSigned16();
   ay = readSigned16();
+
   az = readSigned16();
 
   tempRaw = readSigned16();

@@ -18,6 +18,10 @@
   - Independent hardware failsafe: Cuts motors if command stream stops for >500 ms while armed
 */
 
+#include <Arduino.h>
+#if __has_include(<HardwareSerial.h>)
+#include <HardwareSerial.h>
+#endif
 #include <DHT.h>
 #include <Wire.h>
 #include <ArduinoJson.h>
@@ -45,6 +49,13 @@
 // =====================================================
 // SENSOR CONFIGURATION & THRESHOLDS
 // =====================================================
+#ifndef DHT11
+#define DHT11 11
+#endif
+#ifndef DHT22
+#define DHT22 22
+#endif
+
 #define DHT_TYPE DHT11
 DHT dht(DHT_PIN, DHT_TYPE);
 

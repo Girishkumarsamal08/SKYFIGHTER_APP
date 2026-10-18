@@ -106,7 +106,7 @@ html, body {
   height: 34px;
   border-radius: var(--radius-sm);
   box-shadow: 0 0 12px rgba(255, 85, 0, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  object-fit: cover;
 }
 
 .brand-text {
@@ -141,6 +141,13 @@ html, body {
   color: var(--accent-ember);
   box-shadow: 0 0 8px rgba(255, 107, 0, 0.3);
   letter-spacing: 0.5px;
+}
+
+.sim-pill.disconnected {
+  background: rgba(255, 59, 48, 0.12);
+  border: 1px solid rgba(255, 59, 48, 0.4);
+  color: #ff6b6b;
+  box-shadow: none;
 }
 
 .header-center {
@@ -185,6 +192,40 @@ html, body {
 .status-simulated .pill-dot {
   background: var(--accent-cyan);
   box-shadow: 0 0 6px var(--accent-cyan);
+}
+
+.status-waiting {
+  color: var(--accent-warn);
+  border-color: rgba(255, 183, 3, 0.4);
+  background: rgba(255, 183, 3, 0.1);
+}
+
+.status-waiting .pill-dot {
+  background: var(--accent-warn);
+  box-shadow: 0 0 8px var(--accent-warn);
+  animation: pulse 1.2s infinite;
+}
+
+.status-disconnected {
+  color: #ff6b6b;
+  border-color: rgba(255, 59, 48, 0.4);
+  background: rgba(255, 59, 48, 0.1);
+}
+
+.status-disconnected .pill-dot {
+  background: #ff4d4f;
+  box-shadow: 0 0 8px rgba(255, 77, 79, 0.8);
+}
+
+.status-connected {
+  color: var(--accent-safe);
+  border-color: rgba(0, 240, 118, 0.4);
+  background: rgba(0, 240, 118, 0.1);
+}
+
+.status-connected .pill-dot {
+  background: var(--accent-safe);
+  box-shadow: 0 0 8px var(--accent-safe);
 }
 
 .status-disarmed {
@@ -438,6 +479,18 @@ html, body {
   backdrop-filter: blur(12px);
   gap: 16px;
   transition: all 0.3s ease;
+}
+
+.banner-waiting {
+  border-color: rgba(0, 212, 255, 0.4);
+  background: rgba(0, 212, 255, 0.08);
+  box-shadow: 0 0 16px rgba(0, 212, 255, 0.12);
+}
+
+.banner-disconnected {
+  border-color: rgba(255, 59, 48, 0.4);
+  background: rgba(255, 59, 48, 0.08);
+  box-shadow: 0 0 16px rgba(255, 59, 48, 0.15);
 }
 
 .banner-normal {
@@ -1343,6 +1396,16 @@ html, body {
   background: rgba(0, 240, 118, 0.15);
   color: var(--accent-safe);
   border: 1px solid rgba(0, 240, 118, 0.3);
+}
+
+.diag-badge-warn {
+  font-size: 9px;
+  font-family: var(--font-mono);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 183, 3, 0.15);
+  color: var(--accent-warn);
+  border: 1px solid rgba(255, 183, 3, 0.4);
 }
 
 .diag-table {
