@@ -113,19 +113,66 @@ let reconnectTimer = null;
 // ========================================================
 // INITIALIZATION
 // ========================================================
-document.addEventListener('DOMContentLoaded', () => {
-  initServiceWorker();
-  initNavigation();
-  initTelemetryLoop();
-  initSimulatedCanvases();
-  initFlightControls();
-  initAudio();
-  initSettings();
-  initSerialConnection();
-  initAutoConnect();
-  renderTelemetryUI();
+function bootApp() {
+  try {
+    initServiceWorker();
+  } catch (e) {
+    console.warn('[PWA] Service worker init error:', e);
+  }
+  try {
+    initNavigation();
+  } catch (e) {
+    console.error('[GCS] Navigation init error:', e);
+  }
+  try {
+    initTelemetryLoop();
+  } catch (e) {
+    console.error('[GCS] Telemetry loop init error:', e);
+  }
+  try {
+    initSimulatedCanvases();
+  } catch (e) {
+    console.error('[GCS] Canvases init error:', e);
+  }
+  try {
+    initFlightControls();
+  } catch (e) {
+    console.error('[GCS] Flight controls init error:', e);
+  }
+  try {
+    initAudio();
+  } catch (e) {
+    console.error('[GCS] Audio init error:', e);
+  }
+  try {
+    initSettings();
+  } catch (e) {
+    console.error('[GCS] Settings init error:', e);
+  }
+  try {
+    initSerialConnection();
+  } catch (e) {
+    console.error('[GCS] Serial init error:', e);
+  }
+  try {
+    initAutoConnect();
+  } catch (e) {
+    console.error('[GCS] Auto-connect error:', e);
+  }
+  try {
+    renderTelemetryUI();
+  } catch (e) {
+    console.error('[GCS] Render UI error:', e);
+  }
   logEvent('SYSTEM', 'SKYFIGHTER GCS v1.1 initialized. Standby mode active — waiting for drone connection.');
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', bootApp);
+} else {
+  // If script executes after DOMContentLoaded has already fired
+  bootApp();
+}
 
 // Register Progressive Web App Service Worker
 function initServiceWorker() {
@@ -146,6 +193,7 @@ function initNavigation() {
   const tabBtns = document.querySelectorAll('.tab-btn');
 
   function switchScreen(screenId) {
+    if (!screenId) return;
     state.activeScreen = screenId;
 
     // Update screen views
@@ -154,25 +202,53 @@ function initNavigation() {
     });
 
     // Update sidebar
-    sidebarItems.forEach(item => {
+    document.querySelectorAll('.nav-item').forEach(item => {
       item.classList.toggle('active', item.dataset.screen === screenId);
     });
 
     // Update mobile tabs
-    tabBtns.forEach(btn => {
+    document.querySelectorAll('.tab-btn').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.screen === screenId);
     });
 
     logEvent('SYSTEM', `Switched view to ${screenId.toUpperCase()}`);
   }
 
+  // Direct element binding
   sidebarItems.forEach(item => {
-    item.addEventListener('click', () => switchScreen(item.dataset.screen));
+    item.addEventListener('click', (e) => {
+      e.stopPropagation();
+      switchScreen(item.dataset.screen);
+    });
   });
 
   tabBtns.forEach(btn => {
-    btn.addEventListener('click', () => switchScreen(btn.dataset.screen));
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      switchScreen(btn.dataset.screen);
+    });
   });
+
+  // Delegated binding on the nav menus in case elements are clicked on child spans or icons
+  const navMenu = document.querySelector('.nav-menu');
+  if (navMenu) {
+    navMenu.addEventListener('click', (e) => {
+      const item = e.target.closest('.nav-item');
+      if (item && item.dataset.screen) {
+        switchScreen(item.dataset.screen);
+      }
+    });
+  }
+
+  const mobileTabBar = document.querySelector('.mobile-tab-bar');
+  if (mobileTabBar) {
+    mobileTabBar.addEventListener('click', (e) => {
+      const btn = e.target.closest('.tab-btn');
+      if (btn && btn.dataset.screen) {
+        switchScreen(btn.dataset.screen);
+      }
+    });
+  }
 
   // Header and Dashboard quick actions
   const btnDashViewAll = document.getElementById('btn-dash-view-all');
@@ -1006,9 +1082,6 @@ function initSimulatedCanvases() {
       }
       if (state.waterPumpCooldown > 0) {
         state.waterPumpCooldown = Math.max(0, state.waterPumpCooldown - 0.03);
-      }
-    }
-        }
       }
     }
 

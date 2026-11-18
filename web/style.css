@@ -336,6 +336,11 @@ html, body {
   font-weight: 600;
   transition: all 0.15s ease;
   position: relative;
+  user-select: none;
+}
+
+.nav-item * {
+  pointer-events: none;
 }
 
 .nav-item:hover {
@@ -1899,6 +1904,11 @@ html, body {
   height: 100%;
   cursor: pointer;
   transition: color 0.15s ease;
+  user-select: none;
+}
+
+.tab-btn * {
+  pointer-events: none;
 }
 
 .tab-icon {
