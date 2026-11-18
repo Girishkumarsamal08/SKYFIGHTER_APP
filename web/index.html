@@ -268,16 +268,19 @@
               <p class="section-desc">Live high-definition video feed with edge AI visual fire & smoke detection overlays.</p>
             </div>
             <div class="view-actions">
+              <button id="btn-toggle-camera" class="btn-toggle" style="background: #2563eb; color: #fff; font-weight: 700;">▶ Start Live Camera</button>
               <button id="btn-toggle-ai-boxes" class="btn-toggle active">AI Bounding Boxes: ON</button>
               <button id="btn-cam-snapshot" class="btn-secondary">Capture Snapshot</button>
             </div>
           </div>
 
           <div class="camera-canvas-container">
+            <video id="webcam-video" autoplay playsinline muted style="display:none;"></video>
+            <img id="py-stream-img" src="" style="display:none; width: 100%; height: 100%; object-fit: contain;" crossorigin="anonymous">
             <canvas id="canvas-rgb" width="960" height="540"></canvas>
             <div class="camera-hud-overlay">
               <div class="hud-top-left">
-                <span class="rec-dot"></span> LIVE FEED [RGB]
+                <span class="rec-dot"></span> <span id="rgb-feed-label">LIVE FEED [RGB]</span>
                 <span class="fps-tag" id="rgb-fps">30 FPS</span>
               </div>
               <div class="hud-top-right">
@@ -289,19 +292,30 @@
                 <div class="cross-box"></div>
               </div>
               <div class="hud-bottom-bar">
-                <div id="ai-detection-tag" class="detection-pill">AI INFERENCE: ACTIVE (0.92 CONF)</div>
-                <div class="hud-drone-stats">ALT: 32m | HDG: 142° | SPD: 4.2 m/s</div>
+                <div id="ai-detection-tag" class="detection-pill">AI INFERENCE: PATROL (STANDBY)</div>
+                <div class="hud-drone-stats">
+                  <span id="ai-class-tags" style="margin-right: 8px;">TARGETS: 0</span>
+                  ALT: 32m | HDG: 142° | SPD: 4.2 m/s
+                </div>
               </div>
             </div>
           </div>
 
           <div class="camera-controls-bar">
             <div class="control-item">
-              <label>AI Confidence Threshold:</label>
-              <input type="range" id="slider-conf" min="50" max="95" value="75">
-              <span id="val-conf-threshold">75%</span>
+              <label>Camera Source:</label>
+              <select id="select-cam-source" class="tactical-select">
+                <option value="webcam" selected>💻 Local Laptop Camera / USB Receiver</option>
+                <option value="python_gcs">🚀 Python AI Stream (localhost:5000)</option>
+                <option value="simulation">🌲 Simulated Tactical Forest Drone Patrol</option>
+              </select>
             </div>
             <div class="control-item">
+              <label>AI Confidence Threshold:</label>
+              <input type="range" id="slider-conf" min="20" max="95" value="65">
+              <span id="val-conf-threshold">65%</span>
+            </div>
+            <div class="control-item" id="sim-scenario-group" style="display: none;">
               <label>Simulated Scenario:</label>
               <select id="select-cam-scenario" class="tactical-select">
                 <option value="clear_forest" selected>Normal Clear Canopy Patrol (Safe)</option>
@@ -309,6 +323,10 @@
                 <option value="fire_smoke">Active Canopy Wildfire (Fire + Heavy Smoke)</option>
                 <option value="high_heat">Thermal Hotspot / Campfire</option>
               </select>
+            </div>
+            <div class="control-item">
+              <label>Payload Spray Interlock:</label>
+              <button id="btn-water-spray" class="btn-secondary" style="padding: 6px 14px; font-weight: 700; color: #ef4444; border-color: #ef4444;" disabled>Water Spray (DISARMED)</button>
             </div>
           </div>
         </section>

@@ -28,9 +28,18 @@ const state = {
   clientId: 'SKYFIGHTER-GCS-01',
   activeScenario: 'clear_forest',
   showAiBoxes: true,
-  aiConfidenceThreshold: 0.75,
+  aiConfidenceThreshold: 0.65,
   thermalPalette: 'ironbow',
   thermalMaxTriggerC: 85,
+  
+  // Camera & Edge AI Vision State
+  cameraActive: false,
+  cameraSource: 'webcam', // 'webcam', 'python_gcs', 'simulation'
+  cameraStream: null,
+  waterPumpSprayActive: false,
+  waterPumpCountdown: 0.0,
+  waterPumpCooldown: 0.0,
+  targetFireLocked: false,
   
   // Pilot Flight Sticks
   sticks: {
@@ -766,14 +775,128 @@ function initSimulatedCanvases() {
       ctx.textAlign = 'left';
     }
 
+    // Optical Fire & Smoke Analyzer Function
+    let frameCheckTick = 0;
+    let detectedFireBoxes = [];
+    let firePersistenceCounter = 0;
+
+    function analyzeFrameForFire(ctx, w, h) {
+      frameCheckTick++;
+      if (frameCheckTick % 4 === 0) {
+        try {
+          const step = 8;
+          const imgData = ctx.getImageData(0, 0, w, h).data;
+          let minX = w, maxX = 0, minY = h, maxY = 0;
+          let firePixelCount = 0;
+
+          for (let y = 0; y < h; y += step) {
+            for (let x = 0; x < w; x += step) {
+              const idx = (y * w + x) * 4;
+              const r = imgData[idx];
+              const g = imgData[idx + 1];
+              const b = imgData[idx + 2];
+
+              // Optical flame chromaticity signature
+              if (r > 190 && g > 75 && b < 100 && r > (g + 35) && g > b) {
+                firePixelCount++;
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+              }
+            }
+          }
+
+          if (firePixelCount >= 8 && (maxX - minX) > 20 && (maxY - minY) > 20) {
+            firePersistenceCounter = Math.min(firePersistenceCounter + 1, 10);
+            detectedFireBoxes = [{
+              x: Math.max(0, minX - 15),
+              y: Math.max(0, minY - 15),
+              w: Math.min(w, maxX - minX + 30),
+              h: Math.min(h, maxY - minY + 30),
+              conf: Math.min(0.96, 0.70 + (firePixelCount * 0.005))
+            }];
+          } else {
+            firePersistenceCounter = Math.max(firePersistenceCounter - 1, 0);
+            if (firePersistenceCounter === 0) detectedFireBoxes = [];
+          }
+        } catch (e) {}
+      }
+
+      if (state.showAiBoxes) {
+        for (const b of detectedFireBoxes) {
+          ctx.strokeStyle = '#ef4444';
+          ctx.lineWidth = 3;
+          ctx.strokeRect(b.x, b.y, b.w, b.h);
+
+          ctx.fillStyle = 'rgba(239, 68, 68, 0.9)';
+          ctx.fillRect(b.x, Math.max(0, b.y - 24), 140, 22);
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 12px monospace';
+          ctx.fillText(`FIRE: ${b.conf.toFixed(2)} (AI)`, b.x + 5, Math.max(16, b.y - 8));
+        }
+      }
+
+      const detectionTag = document.getElementById('ai-detection-tag');
+      const classTags = document.getElementById('ai-class-tags');
+      const sprayBtn = document.getElementById('btn-water-spray');
+
+      if (firePersistenceCounter >= 3) {
+        state.targetFireLocked = true;
+        if (detectionTag) {
+          detectionTag.className = 'detection-pill alert';
+          detectionTag.textContent = `! FIRE ALERT: LOCKED (${firePersistenceCounter}/3) !`;
+          detectionTag.style.background = '#ef4444';
+          detectionTag.style.color = '#fff';
+        }
+        if (classTags) classTags.textContent = 'FIRE: 1 | SMOKE: 0 | HUMAN: 0 | ANIMAL: 0';
+        if (sprayBtn && !state.waterPumpSprayActive) {
+          sprayBtn.disabled = !state.isArmed;
+          sprayBtn.textContent = state.isArmed ? 'ACTIVATE WATER SPRAY (3s)' : 'SPRAY (REQUIRES PILOT ARM)';
+          sprayBtn.style.color = state.isArmed ? '#ffffff' : '#ef4444';
+          sprayBtn.style.background = state.isArmed ? '#ef4444' : 'transparent';
+        }
+      } else {
+        state.targetFireLocked = false;
+        if (detectionTag) {
+          detectionTag.className = 'detection-pill';
+          detectionTag.textContent = firePersistenceCounter > 0 ? `VERIFYING TARGET: [${firePersistenceCounter}/3]` : 'AI INFERENCE: PATROL (NORMAL)';
+          detectionTag.style.background = firePersistenceCounter > 0 ? '#f59e0b' : 'rgba(0, 212, 255, 0.2)';
+          detectionTag.style.color = firePersistenceCounter > 0 ? '#000' : '#00d4ff';
+        }
+        if (classTags) classTags.textContent = 'TARGETS: 0';
+        if (sprayBtn && !state.waterPumpSprayActive) {
+          sprayBtn.disabled = true;
+          sprayBtn.textContent = 'Water Spray (DISARMED)';
+          sprayBtn.style.background = 'transparent';
+          sprayBtn.style.color = '#ef4444';
+        }
+      }
+    }
+
     // 1. Render RGB Aerial Canopy View
     if (canvasRgb) {
-      const ctx = canvasRgb.getContext('2d');
+      const ctx = canvasRgb.getContext('2d', { willReadFrequently: true });
       const w = canvasRgb.width;
       const h = canvasRgb.height;
 
-      if (!isLive && !isSim) {
-        drawStandbyHUD(ctx, w, h, 'AERIAL RGB CAMERA — STANDBY', 'Waiting for live video stream from drone Wi-Fi gateway', 'SSID: SKYFIGHTER_GATEWAY | ws://192.168.4.1:8080');
+      if (state.cameraActive && state.cameraSource === 'webcam') {
+        const videoEl = document.getElementById('webcam-video');
+        if (videoEl && videoEl.readyState >= 2) {
+          ctx.drawImage(videoEl, 0, 0, w, h);
+          analyzeFrameForFire(ctx, w, h);
+        } else {
+          drawStandbyHUD(ctx, w, h, 'CONNECTING TO DEVICE CAMERA...', 'Authorizing video media stream from browser', 'DEVICE: LAPTOP WEBCAM / USB CAPTURE');
+        }
+      } else if (state.cameraActive && state.cameraSource === 'python_gcs') {
+        const imgEl = document.getElementById('py-stream-img');
+        if (imgEl && imgEl.complete && imgEl.naturalWidth > 0) {
+          ctx.drawImage(imgEl, 0, 0, w, h);
+        } else {
+          drawStandbyHUD(ctx, w, h, 'PYTHON YOLO GCS FEED — STANDBY', 'Waiting for http://localhost:5000/video_feed', 'RUN: python3 ai_pipeline/dashboard/app.py');
+        }
+      } else if (!isLive && !isSim && !state.cameraActive) {
+        drawStandbyHUD(ctx, w, h, 'AERIAL RGB CAMERA — STANDBY', 'Click "Start Live Camera" or select Python GCS stream', 'SSID: SKYFIGHTER_GATEWAY | ws://192.168.4.1:8080');
       } else {
         // Dark lush forest gradient
         const bg = ctx.createLinearGradient(0, 0, w, h);
@@ -849,6 +972,42 @@ function initSimulatedCanvases() {
             ctx.font = 'bold 11px monospace';
             ctx.fillText('SMOKE: 0.88 (PLUME)', fireX - 75, fireY - 150);
           }
+        }
+      }
+
+      // Render Water Spray Effect overlay if triggered
+      if (state.waterPumpSprayActive) {
+        state.waterPumpCountdown -= 0.03;
+        if (state.waterPumpCountdown <= 0) {
+          state.waterPumpSprayActive = false;
+          state.waterPumpCountdown = 0;
+          state.waterPumpCooldown = 5.0;
+          logEvent('SYSTEM', 'Water spray sequence completed (3s). Cooling down.');
+        }
+
+        // Draw animated blue water droplets
+        ctx.fillStyle = 'rgba(6, 182, 212, 0.7)';
+        for (let p = 0; p < 25; p++) {
+          const sx = w * 0.5 + (Math.sin(tick * 5 + p) * 120);
+          const sy = h * 0.3 + ((tick * 15 + p * 20) % (h * 0.6));
+          ctx.beginPath();
+          ctx.arc(sx, sy, 4 + (p % 4), 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // Tactical HUD Banner
+        ctx.fillStyle = 'rgba(6, 182, 212, 0.9)';
+        ctx.fillRect(w / 2 - 160, h - 55, 320, 32);
+        ctx.fillStyle = '#000000';
+        ctx.font = 'bold 13px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(`>>> WATER PUMP ACTIVE (${state.waterPumpCountdown.toFixed(1)}s) <<<`, w / 2, h - 34);
+        ctx.textAlign = 'left';
+      }
+      if (state.waterPumpCooldown > 0) {
+        state.waterPumpCooldown = Math.max(0, state.waterPumpCooldown - 0.03);
+      }
+    }
         }
       }
     }
@@ -989,7 +1148,7 @@ function initSimulatedCanvases() {
 
   requestAnimationFrame(renderFrame);
 
-  // Wire scenario and AI controls
+  // Wire scenario, camera and AI controls
   const selScenario = document.getElementById('select-cam-scenario');
   if (selScenario) {
     selScenario.addEventListener('change', (e) => {
@@ -1004,6 +1163,110 @@ function initSimulatedCanvases() {
       state.showAiBoxes = !state.showAiBoxes;
       btnToggleAi.textContent = `AI Bounding Boxes: ${state.showAiBoxes ? 'ON' : 'OFF'}`;
       btnToggleAi.classList.toggle('active', state.showAiBoxes);
+    });
+  }
+
+  // Camera Setup and Toggle Handling
+  const btnToggleCamera = document.getElementById('btn-toggle-camera');
+  const selCamSource = document.getElementById('select-cam-source');
+  const simGroup = document.getElementById('sim-scenario-group');
+  const btnWaterSpray = document.getElementById('btn-water-spray');
+  const videoEl = document.getElementById('webcam-video');
+  const pyImg = document.getElementById('py-stream-img');
+
+  async function startCamera() {
+    if (state.cameraSource === 'webcam') {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 1280 }, height: { ideal: 720 } }
+        });
+        state.cameraStream = stream;
+        if (videoEl) {
+          videoEl.srcObject = stream;
+          videoEl.play();
+        }
+        state.cameraActive = true;
+        if (btnToggleCamera) {
+          btnToggleCamera.textContent = '⏹ Stop Camera';
+          btnToggleCamera.style.background = '#ef4444';
+        }
+        logEvent('SYSTEM', 'Laptop video camera connected.');
+      } catch (err) {
+        console.error('Camera access error:', err);
+        alert('Could not access camera: ' + err.message + '\nPlease check camera permissions in your browser or macOS settings.');
+        state.cameraActive = false;
+      }
+    } else if (state.cameraSource === 'python_gcs') {
+      if (pyImg) {
+        pyImg.src = 'http://localhost:5000/video_feed?' + Date.now();
+      }
+      state.cameraActive = true;
+      if (btnToggleCamera) {
+        btnToggleCamera.textContent = '⏹ Disconnect GCS';
+        btnToggleCamera.style.background = '#ef4444';
+      }
+      logEvent('SYSTEM', 'Connecting to Python YOLO GCS on http://localhost:5000/video_feed');
+    } else {
+      state.cameraActive = true;
+      if (btnToggleCamera) {
+        btnToggleCamera.textContent = '⏹ Stop Sim';
+        btnToggleCamera.style.background = '#ef4444';
+      }
+    }
+  }
+
+  function stopCamera() {
+    if (state.cameraStream) {
+      state.cameraStream.getTracks().forEach(track => track.stop());
+      state.cameraStream = null;
+    }
+    if (videoEl) videoEl.srcObject = null;
+    if (pyImg) pyImg.src = '';
+    state.cameraActive = false;
+    if (btnToggleCamera) {
+      btnToggleCamera.textContent = '▶ Start Live Camera';
+      btnToggleCamera.style.background = '#2563eb';
+    }
+    logEvent('SYSTEM', 'Camera stream disconnected.');
+  }
+
+  if (btnToggleCamera) {
+    btnToggleCamera.addEventListener('click', () => {
+      if (state.cameraActive) {
+        stopCamera();
+      } else {
+        startCamera();
+      }
+    });
+  }
+
+  if (selCamSource) {
+    selCamSource.addEventListener('change', (e) => {
+      stopCamera();
+      state.cameraSource = e.target.value;
+      if (simGroup) {
+        simGroup.style.display = state.cameraSource === 'simulation' ? 'flex' : 'none';
+      }
+      logEvent('SYSTEM', `Camera source switched to: ${state.cameraSource}`);
+    });
+  }
+
+  if (btnWaterSpray) {
+    btnWaterSpray.addEventListener('click', () => {
+      if (!state.isArmed) {
+        alert('SAFETY INTERLOCK: Pilot must ARM the drone before activating water spray!');
+        return;
+      }
+      if (state.waterPumpCooldown > 0) {
+        alert(`PUMP COOLDOWN: Please wait ${state.waterPumpCooldown.toFixed(1)}s before next spray.`);
+        return;
+      }
+      state.waterPumpSprayActive = true;
+      state.waterPumpCountdown = 3.0;
+      logEvent('ALERT', 'WATER SPRAY ACTIVATED for 3 seconds on confirmed fire.');
+
+      // Also notify Python backend if running
+      fetch('http://localhost:5000/api/trigger_pump', { method: 'POST' }).catch(() => {});
     });
   }
 }

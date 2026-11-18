@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FIRE GUARDIAN — Drone GCS Dashboard</title>
+    <style>
+        :root {
+            --bg-dark: #0f141c;
+            --card-bg: #18202c;
+            --border-color: #273549;
+            --text-main: #e2e8f0;
+            --text-muted: #94a3b8;
+            --accent-red: #ef4444;
+            --accent-green: #22c55e;
+            --accent-yellow: #f59e0b;
+            --accent-cyan: #06b6d4;
+            --accent-blue: #3b82f6;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            padding: 16px 24px;
+            min-height: 100vh;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 20px;
+        }
+
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-badge {
+            background: linear-gradient(135deg, #ef4444, #f97316);
+            color: #fff;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            font-size: 14px;
+        }
+
+        h1 {
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .header-status {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .status-pill {
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-pill::before {
+            content: "";
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .status-patrol {
+            background: rgba(34, 197, 94, 0.15);
+            color: var(--accent-green);
+            border: 1px solid var(--accent-green);
+        }
+        .status-patrol::before { background: var(--accent-green); }
+
+        .status-verifying {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--accent-yellow);
+            border: 1px solid var(--accent-yellow);
+        }
+        .status-verifying::before { background: var(--accent-yellow); }
+
+        .status-alert {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--accent-red);
+            border: 1px solid var(--accent-red);
+            animation: pulse-border 1.5s infinite;
+        }
+        .status-alert::before {
+            background: var(--accent-red);
+            animation: blink 0.8s infinite;
+        }
+
+        @keyframes pulse-border {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
+            70% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
+        @keyframes blink {
+            50% { opacity: 0.2; }
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 16px;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .card-title {
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+        }
+
+        .video-container {
+            position: relative;
+            width: 100%;
+            height: 480px;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .video-stream {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .telemetry-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-top: 14px;
+        }
+
+        .metric-box {
+            background: #111722;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+        }
+
+        .metric-val {
+            font-size: 22px;
+            font-weight: 700;
+            margin-top: 4px;
+        }
+
+        .metric-lbl {
+            font-size: 11px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+        }
+
+        .control-group {
+            margin-bottom: 18px;
+        }
+
+        .control-group label {
+            display: block;
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+        }
+
+        select, input[type="range"] {
+            width: 100%;
+            padding: 8px 12px;
+            border-radius: 6px;
+            background: #111722;
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            font-size: 14px;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-size: 13px;
+            transition: all 0.2s;
+            margin-bottom: 10px;
+        }
+
+        .btn-arm {
+            background: #2563eb;
+            color: #fff;
+        }
+        .btn-arm:hover { background: #1d4ed8; }
+
+        .btn-armed {
+            background: #f59e0b;
+            color: #000;
+        }
+
+        .btn-spray {
+            background: var(--accent-red);
+            color: #fff;
+        }
+        .btn-spray:disabled {
+            background: #334155;
+            color: #64748b;
+            cursor: not-allowed;
+        }
+
+        .btn-stop {
+            background: #475569;
+            color: #fff;
+        }
+        .btn-stop:hover { background: #334155; }
+
+        .log-box {
+            height: 180px;
+            background: #111722;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            overflow-y: auto;
+            color: #cbd5e1;
+        }
+
+        .log-item {
+            margin-bottom: 6px;
+            padding-bottom: 4px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .log-time { color: var(--text-muted); }
+        .log-alert { color: var(--accent-red); font-weight: bold; }
+        .log-pump { color: var(--accent-cyan); font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="header-title">
+            <div class="logo-badge">FIRE GUARDIAN</div>
+            <h1>Autonomous Forest Fire Drone Ground Station</h1>
+        </div>
+        <div class="header-status">
+            <div id="statusPill" class="status-pill status-patrol">Status: Normal Patrol</div>
+        </div>
+    </header>
+
+    <div class="main-grid">
+        <!-- Video Stream & Primary HUD -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">Live Tactical Camera Stream</span>
+                <span id="fpsDisplay" style="font-size: 12px; color: var(--text-muted);">FPS: --</span>
+            </div>
+            <div class="video-container">
+                <img id="videoFeed" class="video-stream" src="/video_feed" alt="Video Stream">
+            </div>
+
+            <div class="telemetry-row">
+                <div class="metric-box">
+                    <div class="metric-lbl">Fire Objects</div>
+                    <div id="countFire" class="metric-val" style="color: var(--accent-red);">0</div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-lbl">Smoke Plumes</div>
+                    <div id="countSmoke" class="metric-val" style="color: #cbd5e1;">0</div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-lbl">Humans</div>
+                    <div id="countHuman" class="metric-val" style="color: var(--accent-green);">0</div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-lbl">Animals</div>
+                    <div id="countAnimal" class="metric-val" style="color: var(--accent-cyan);">0</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Controls & Safety Interlock Panel -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">Flight & Payload Control</span>
+            </div>
+
+            <!-- Video Source Selector -->
+            <div class="control-group">
+                <label>Video Source</label>
+                <select id="sourceSelect" onchange="changeSource(this.value)">
+                    <option value="camera">Live Camera (Device 0 / USB Receiver)</option>
+                    <option value="patrol">Simulated Drone Patrol Clip</option>
+                </select>
+            </div>
+
+            <!-- Confidence Slider -->
+            <div class="control-group">
+                <label>Detection Confidence (<span id="confVal">0.25</span>)</label>
+                <input type="range" id="confSlider" min="0.05" max="0.95" step="0.05" value="0.25" oninput="changeConf(this.value)">
+            </div>
+
+            <!-- Pilot Safety Authorization Interlock -->
+            <div class="control-group" style="padding: 12px; background: #111722; border-radius: 6px; border: 1px solid var(--border-color);">
+                <label style="color: #f1f5f9; font-weight: 600;">Pilot Authorization Interlock</label>
+                <button id="armBtn" class="btn btn-arm" onclick="toggleArm()">Pilot Arm: DISARMED</button>
+                <button id="sprayBtn" class="btn btn-spray" onclick="triggerSpray()" disabled>Activate Water Spray (3s)</button>
+                <button class="btn btn-stop" onclick="emergencyStop()">Emergency Safe Cutoff</button>
+            </div>
+
+            <!-- Mission Event Logs -->
+            <div class="card-header" style="margin-top: 10px;">
+                <span class="card-title">Mission Event Log</span>
+            </div>
+            <div id="logBox" class="log-box">
+                <div class="log-item"><span class="log-time">[SYSTEM]</span> Ground station telemetry online.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let isArmed = false;
+        let fireLocked = false;
+        let pumpActive = false;
+
+        function updateTelemetry() {
+            fetch('/api/telemetry')
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('fpsDisplay').innerText = `FPS: ${data.fps.toFixed(1)} | Latency: ${data.latency_ms.toFixed(0)} ms`;
+                    document.getElementById('countFire').innerText = data.counts.Fire;
+                    document.getElementById('countSmoke').innerText = data.counts.Smoke;
+                    document.getElementById('countHuman').innerText = data.counts.Human;
+                    document.getElementById('countAnimal').innerText = data.counts.Animal;
+
+                    const statusPill = document.getElementById('statusPill');
+                    if (data.fire_alert_active) {
+                        statusPill.className = 'status-pill status-alert';
+                        statusPill.innerText = `! FIRE ALERT: LOCKED (${data.persistence}/${data.persistence_threshold}) !`;
+                        fireLocked = true;
+                    } else if (data.persistence > 0) {
+                        statusPill.className = 'status-pill status-verifying';
+                        statusPill.innerText = `Verifying Target: [${data.persistence}/${data.persistence_threshold}]`;
+                        fireLocked = false;
+                    } else {
+                        statusPill.className = 'status-pill status-patrol';
+                        statusPill.innerText = 'Status: Normal Patrol';
+                        fireLocked = false;
+                    }
+
+                    // Water Pump button safety condition: Pilot must be ARMED AND fire locked
+                    const sprayBtn = document.getElementById('sprayBtn');
+                    if (data.pump_active) {
+                        sprayBtn.disabled = true;
+                        sprayBtn.innerText = `SPRAYING WATER... (${data.pump_countdown}s)`;
+                        sprayBtn.style.background = '#06b6d4';
+                    } else if (isArmed && fireLocked) {
+                        sprayBtn.disabled = false;
+                        sprayBtn.innerText = 'ACTIVATE WATER SPRAY (3s)';
+                        sprayBtn.style.background = '#ef4444';
+                    } else {
+                        sprayBtn.disabled = true;
+                        sprayBtn.innerText = isArmed ? 'WAITING FOR TARGET LOCK' : 'REQUIRES PILOT ARM';
+                        sprayBtn.style.background = '#334155';
+                    }
+                })
+                .catch(err => console.error("Telemetry error:", err));
+        }
+
+        setInterval(updateTelemetry, 400);
+
+        function changeSource(val) {
+            fetch('/api/set_source', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({source: val})
+            }).then(() => {
+                logMessage(`Video source switched to: ${val}`);
+                // Refresh stream
+                document.getElementById('videoFeed').src = '/video_feed?' + new Date().getTime();
+            });
+        }
+
+        function changeConf(val) {
+            document.getElementById('confVal').innerText = val;
+            fetch('/api/set_conf', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({conf: parseFloat(val)})
+            });
+        }
+
+        function toggleArm() {
+            isArmed = !isArmed;
+            const btn = document.getElementById('armBtn');
+            if (isArmed) {
+                btn.className = 'btn btn-armed';
+                btn.innerText = 'PILOT STATUS: ARMED';
+                logMessage('PILOT AUTHORIZATION: ARMED by operator.');
+            } else {
+                btn.className = 'btn btn-arm';
+                btn.innerText = 'PILOT STATUS: DISARMED';
+                logMessage('PILOT AUTHORIZATION: DISARMED.');
+            }
+            fetch('/api/pilot_arm', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({armed: isArmed})
+            });
+        }
+
+        function triggerSpray() {
+            fetch('/api/trigger_pump', {method: 'POST'})
+                .then(r => r.json())
+                .then(res => {
+                    logMessage(`<span class="log-pump">[PUMP ACTIVE]</span> Water spray triggered for 3 seconds.`);
+                });
+        }
+
+        function emergencyStop() {
+            isArmed = false;
+            document.getElementById('armBtn').className = 'btn btn-arm';
+            document.getElementById('armBtn').innerText = 'PILOT STATUS: DISARMED';
+            fetch('/api/emergency_stop', {method: 'POST'})
+                .then(() => {
+                    logMessage(`<span class="log-alert">[EMERGENCY]</span> Water pump locked out. System safe.`);
+                });
+        }
+
+        function logMessage(msg) {
+            const box = document.getElementById('logBox');
+            const time = new Date().toLocaleTimeString();
+            box.innerHTML = `<div class="log-item"><span class="log-time">[${time}]</span> ${msg}</div>` + box.innerHTML;
+        }
+    </script>
+</body>
+</html>
