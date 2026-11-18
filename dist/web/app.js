@@ -893,7 +893,7 @@ function initSimulatedCanvases() {
         if (imgEl && imgEl.complete && imgEl.naturalWidth > 0) {
           ctx.drawImage(imgEl, 0, 0, w, h);
         } else {
-          drawStandbyHUD(ctx, w, h, 'PYTHON YOLO GCS FEED — STANDBY', 'Waiting for http://localhost:5000/video_feed', 'RUN: python3 ai_pipeline/dashboard/app.py');
+          drawStandbyHUD(ctx, w, h, 'PYTHON YOLO GCS FEED — STANDBY', 'Waiting for http://localhost:5050/video_feed', 'RUN: python3 ai_pipeline/dashboard/app.py');
         }
       } else if (!isLive && !isSim && !state.cameraActive) {
         drawStandbyHUD(ctx, w, h, 'AERIAL RGB CAMERA — STANDBY', 'Click "Start Live Camera" or select Python GCS stream', 'SSID: SKYFIGHTER_GATEWAY | ws://192.168.4.1:8080');
@@ -1198,14 +1198,14 @@ function initSimulatedCanvases() {
       }
     } else if (state.cameraSource === 'python_gcs') {
       if (pyImg) {
-        pyImg.src = 'http://localhost:5000/video_feed?' + Date.now();
+        pyImg.src = 'http://localhost:5050/video_feed?' + Date.now();
       }
       state.cameraActive = true;
       if (btnToggleCamera) {
         btnToggleCamera.textContent = '⏹ Disconnect GCS';
         btnToggleCamera.style.background = '#ef4444';
       }
-      logEvent('SYSTEM', 'Connecting to Python YOLO GCS on http://localhost:5000/video_feed');
+      logEvent('SYSTEM', 'Connecting to Python YOLO GCS on http://localhost:5050/video_feed');
     } else {
       state.cameraActive = true;
       if (btnToggleCamera) {
@@ -1266,7 +1266,8 @@ function initSimulatedCanvases() {
       logEvent('ALERT', 'WATER SPRAY ACTIVATED for 3 seconds on confirmed fire.');
 
       // Also notify Python backend if running
-      fetch('http://localhost:5000/api/trigger_pump', { method: 'POST' }).catch(() => {});
+      fetch('http://localhost:5050/api/trigger_pump', { method: 'POST' })
+        .catch(() => fetch('http://localhost:5000/api/trigger_pump', { method: 'POST' }).catch(() => {}));
     });
   }
 }

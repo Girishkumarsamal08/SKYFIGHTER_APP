@@ -263,8 +263,20 @@ def emergency_stop():
         state["pump_cooldown"] = 10.0
     return jsonify({"status": "ok", "message": "Emergency shutdown activated"})
 
+def find_available_port(start_port=5050):
+    import socket
+    for p in [start_port, 5051, 5052, 8000, 8080, 8888]:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            res = s.connect_ex(('127.0.0.1', p))
+            if res != 0: # Port is available
+                return p
+    return start_port
+
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
+    # Use port 5050 by default because macOS AirPlay Receiver occupies port 5000
+    preferred = int(os.environ.get("PORT", 5050))
+    port = find_available_port(preferred) if "PORT" not in os.environ else preferred
+
     print(f"\n========================================================")
     print(f"   FIRE GUARDIAN GCS WEB DASHBOARD ACTIVE")
     print(f"   Open in your browser: http://localhost:{port}")
