@@ -84,6 +84,11 @@
             <span class="nav-icon">📹</span>
             <span class="nav-text">RGB Live Cam</span>
           </li>
+          <li class="nav-item" data-screen="aistream">
+            <span class="nav-icon">🎯</span>
+            <span class="nav-text">AI Cam Stream</span>
+            <span class="nav-badge" style="background: #22c55e; color: #000; font-size: 9px; padding: 2px 5px; border-radius: 4px; font-weight: bold;">:5050</span>
+          </li>
           <li class="nav-item" data-screen="thermal">
             <span class="nav-icon">🔥</span>
             <span class="nav-text">Thermal Cam</span>
@@ -327,6 +332,77 @@
             <div class="control-item">
               <label>Payload Spray Interlock:</label>
               <button id="btn-water-spray" class="btn-secondary" style="padding: 6px 14px; font-weight: 700; color: #ef4444; border-color: #ef4444;" disabled>Water Spray (DISARMED)</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ======================================================= -->
+        <!-- SCREEN 2B: LOCAL AI CAM STREAM (:5050) -->
+        <!-- ======================================================= -->
+        <section id="screen-aistream" class="screen-view">
+          <div class="view-header">
+            <div>
+              <h2>Local AI Cam Stream & GCS Vision (:5050)</h2>
+              <p class="section-desc">Real-time YOLOv8 fire, smoke, human, and animal detection stream from your laptop server.</p>
+            </div>
+            <div class="view-actions">
+              <a href="http://localhost:5050" target="_blank" rel="noopener noreferrer" class="btn-primary" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px; background: #2563eb; color: #fff; padding: 8px 16px; border-radius: 6px; font-weight: 600; font-size: 13px;">
+                <span>🔗</span> Open http://localhost:5050
+              </a>
+              <button onclick="const img = document.getElementById('local-aistream-img'); if (img) { img.src = 'http://localhost:5050/video_feed?' + Date.now(); img.style.display='block'; const fb = document.getElementById('aistream-fallback-box'); if (fb) fb.style.display='none'; }" class="btn-secondary">
+                🔄 Reconnect Stream
+              </button>
+            </div>
+          </div>
+
+          <div class="camera-canvas-container" style="background: #000; min-height: 520px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative;">
+            <img id="local-aistream-img" src="http://localhost:5050/video_feed" style="width: 100%; height: 100%; max-height: 540px; object-fit: contain; border-radius: 8px;" alt="AI Cam Stream (:5050)" onerror="this.style.display='none'; const fb = document.getElementById('aistream-fallback-box'); if (fb) fb.style.display='flex';">
+            
+            <div id="aistream-fallback-box" style="display: none; flex-direction: column; align-items: center; justify-content: center; padding: 40px; text-align: center;">
+              <span style="font-size: 40px; margin-bottom: 12px;">📡</span>
+              <h3 style="color: #00d4ff; margin-bottom: 8px; font-size: 18px;">Waiting for Local AI GCS Server</h3>
+              <p style="color: #8a96aa; max-width: 520px; font-size: 13px; line-height: 1.5; margin-bottom: 16px;">
+                To view the live YOLO stream here, start the Ground Station server in your terminal on your laptop:
+              </p>
+              <div style="background: #111722; padding: 12px 20px; border-radius: 8px; border: 1px solid #273549; margin-bottom: 18px; font-family: monospace; color: #22c55e; font-size: 13px; user-select: all;">
+                python3 ai_pipeline/dashboard/app.py
+              </div>
+              <div style="display: flex; gap: 12px;">
+                <button onclick="const img = document.getElementById('local-aistream-img'); if (img) { img.src = 'http://localhost:5050/video_feed?' + Date.now(); img.style.display='block'; document.getElementById('aistream-fallback-box').style.display='none'; }" style="background: #2563eb; color: #fff; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; cursor: pointer;">
+                  🔄 Retry Connection
+                </button>
+                <a href="http://localhost:5050" target="_blank" rel="noopener noreferrer" style="background: #334155; color: #fff; text-decoration: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; display: inline-flex; align-items: center;">
+                  Open Directly
+                </a>
+              </div>
+            </div>
+
+            <!-- Overlaid tactical watermark -->
+            <div class="camera-hud-overlay" style="pointer-events: none;">
+              <div class="hud-top-left">
+                <span class="rec-dot"></span> LOCAL AI GCS FEED [YOLOv8]
+                <span class="fps-tag">PORT 5050</span>
+              </div>
+              <div class="hud-bottom-bar">
+                <div class="detection-pill" style="background: rgba(34, 197, 94, 0.2); color: #22c55e; border: 1px solid #22c55e;">
+                  TARGETS: FIRE | SMOKE | HUMAN | ANIMAL
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="camera-controls-bar" style="margin-top: 14px;">
+            <div class="control-item">
+              <label>Local Stream Host:</label>
+              <span style="color: #00d4ff; font-family: monospace; font-size: 13px; font-weight: 600;">http://localhost:5050</span>
+            </div>
+            <div class="control-item">
+              <label>AI Model Weights:</label>
+              <span style="color: #94a3b8; font-family: monospace; font-size: 12px;">ai/weights/best.pt (YOLOv8 Nano)</span>
+            </div>
+            <div class="control-item">
+              <label>Direct Stream URL:</label>
+              <a href="http://localhost:5050/video_feed" target="_blank" style="color: #3b82f6; font-size: 13px;">http://localhost:5050/video_feed</a>
             </div>
           </div>
         </section>
@@ -852,6 +928,10 @@
       <button class="tab-btn" data-screen="livecam">
         <span class="tab-icon">📹</span>
         <span class="tab-label">RGB</span>
+      </button>
+      <button class="tab-btn" data-screen="aistream">
+        <span class="tab-icon">🎯</span>
+        <span class="tab-label">AI:5050</span>
       </button>
       <button class="tab-btn" data-screen="thermal">
         <span class="tab-icon">🔥</span>
