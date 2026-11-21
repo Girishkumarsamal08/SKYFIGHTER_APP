@@ -1250,32 +1250,51 @@ function initSimulatedCanvases() {
   let lastHazardAudioTime = 0;
 
   const streamImg = document.getElementById('drone-live-stream-img');
+  const streamImgAi = document.getElementById('drone-live-stream-img-ai');
   const offlineBox = document.getElementById('cam-offline-box');
+  const offlineBoxAi = document.getElementById('cam-fallback-box-ai');
   const btnToggleCamera = document.getElementById('btn-toggle-camera');
+  const btnToggleCameraAi = document.getElementById('btn-toggle-camera-ai');
   const btnToggleAnnotated = document.getElementById('btn-toggle-annotated');
+  const btnToggleAnnotatedAi = document.getElementById('btn-toggle-annotated-ai');
   const btnFullscreen = document.getElementById('btn-camera-fullscreen');
+  const btnFullscreenAi = document.getElementById('btn-camera-fullscreen-ai');
   const btnSnapshot = document.getElementById('btn-cam-snapshot');
+  const btnSnapshotAi = document.getElementById('btn-cam-snapshot-ai');
   const selCamSource = document.getElementById('select-cam-source');
+  const selCamSourceAi = document.getElementById('select-cam-source-ai');
   const esp32Group = document.getElementById('esp32-url-group');
+  const esp32GroupAi = document.getElementById('esp32-url-group-ai');
   const inputEsp32Url = document.getElementById('input-esp32-url');
+  const inputEsp32UrlAi = document.getElementById('input-esp32-url-ai');
   const btnApplyEsp32Url = document.getElementById('btn-apply-esp32-url');
+  const btnApplyEsp32UrlAi = document.getElementById('btn-apply-esp32-url-ai');
   const inputBackendUrl = document.getElementById('input-backend-url');
+  const inputBackendUrlAi = document.getElementById('input-backend-url-ai');
   const btnReconnectVision = document.getElementById('btn-reconnect-vision');
   const btnQuickSwitchSim = document.getElementById('btn-quick-switch-sim');
   const btnSaveThresholds = document.getElementById('btn-save-thresholds');
+  const btnSaveThresholdsAi = document.getElementById('btn-save-thresholds-ai');
   const btnTestAlert = document.getElementById('btn-test-alert');
+  const btnTestAlertAi = document.getElementById('btn-test-alert-ai');
   const btnClearAlerts = document.getElementById('btn-clear-alerts');
+  const btnClearAlertsAi = document.getElementById('btn-clear-alerts-ai');
   const btnWaterSpray = document.getElementById('btn-water-spray');
+  const btnWaterSprayAi = document.getElementById('btn-water-spray-ai');
 
-  if (inputBackendUrl) {
-    inputBackendUrl.value = visionBackendUrl;
-    inputBackendUrl.addEventListener('change', (e) => {
-      visionBackendUrl = e.target.value.trim().replace(/\/+$/, '');
-      localStorage.setItem('skyfighter_backend_url', visionBackendUrl);
-      logEvent('SYSTEM', `Drone Vision backend URL updated: ${visionBackendUrl}`);
-      if (isStreamRunning) startVisionStream();
-    });
-  }
+  [inputBackendUrl, inputBackendUrlAi].forEach(inp => {
+    if (inp) {
+      inp.value = visionBackendUrl;
+      inp.addEventListener('change', (e) => {
+        visionBackendUrl = e.target.value.trim().replace(/\/+$/, '');
+        localStorage.setItem('skyfighter_backend_url', visionBackendUrl);
+        if (inputBackendUrl) inputBackendUrl.value = visionBackendUrl;
+        if (inputBackendUrlAi) inputBackendUrlAi.value = visionBackendUrl;
+        logEvent('SYSTEM', `Drone Vision backend URL updated: ${visionBackendUrl}`);
+        if (isStreamRunning) startVisionStream();
+      });
+    }
+  });
 
   function formatUptime(seconds) {
     const s = Math.floor(seconds % 60);
@@ -1332,134 +1351,184 @@ function initSimulatedCanvases() {
     const counts = data.counts || {};
     const cumulative = data.cumulative || {};
 
-    // 1. Connection & HUD Badges
-    const badgeConn = document.getElementById('cam-connection-badge');
-    const badgeFps = document.getElementById('cam-fps-badge');
-    const badgeRes = document.getElementById('cam-res-badge');
-    const badgeAge = document.getElementById('cam-frame-age');
-    const sourceLabel = document.getElementById('hud-source-label');
-    const uptimeLabel = document.getElementById('stat-camera-uptime');
-    const statusText = document.getElementById('cam-status-text');
+    // 1. Connection & HUD Badges (Update both Live Cam and AI Cam Stream)
+    ['cam-connection-badge', 'cam-connection-badge-ai'].forEach(id => {
+      const b = document.getElementById(id);
+      if (b) {
+        b.textContent = cam.connected ? 'ONLINE' : 'CONNECTING...';
+        b.style.background = cam.connected ? '#22c55e' : '#f59e0b';
+        b.style.color = cam.connected ? '#000000' : '#ffffff';
+      }
+    });
 
-    if (badgeConn) {
-      badgeConn.textContent = cam.connected ? 'ONLINE' : 'CONNECTING...';
-      badgeConn.style.background = cam.connected ? '#22c55e' : '#f59e0b';
-    }
-    if (badgeFps) badgeFps.textContent = `${(cam.fps || 0).toFixed(1)} FPS`;
-    if (badgeRes && cam.resolution) badgeRes.textContent = `${cam.resolution[0]}x${cam.resolution[1]}`;
-    if (badgeAge) badgeAge.textContent = `AGE: ${cam.last_frame_age_ms || 0}ms`;
-    if (sourceLabel) sourceLabel.textContent = `SRC: ${(cam.source || 'STREAM').toUpperCase()}`;
-    if (uptimeLabel && cam.uptime_seconds) uptimeLabel.textContent = formatUptime(cam.uptime_seconds);
-    if (statusText) statusText.textContent = cam.connected ? 'Live video link verified' : 'Connecting to source';
+    ['cam-fps-badge', 'cam-fps-badge-ai'].forEach(id => {
+      const b = document.getElementById(id);
+      if (b) b.textContent = `${(cam.fps || 0).toFixed(1)} FPS`;
+    });
+
+    ['cam-res-badge', 'cam-res-badge-ai'].forEach(id => {
+      const b = document.getElementById(id);
+      if (b && cam.resolution) b.textContent = `${cam.resolution[0]}x${cam.resolution[1]}`;
+    });
+
+    ['cam-frame-age', 'cam-frame-age-ai'].forEach(id => {
+      const b = document.getElementById(id);
+      if (b) b.textContent = `AGE: ${cam.last_frame_age_ms || 0}ms`;
+    });
+
+    ['hud-source-label', 'hud-source-label-ai'].forEach(id => {
+      const b = document.getElementById(id);
+      if (b) b.textContent = `SRC: ${(cam.source || 'STREAM').toUpperCase()}`;
+    });
+
+    ['stat-camera-uptime', 'stat-camera-uptime-ai'].forEach(id => {
+      const b = document.getElementById(id);
+      if (b && cam.uptime_seconds) b.textContent = formatUptime(cam.uptime_seconds);
+    });
+
+    ['cam-status-text', 'cam-status-text-ai'].forEach(id => {
+      const b = document.getElementById(id);
+      if (b) b.textContent = cam.connected ? 'Live video link verified' : 'Connecting to source';
+    });
 
     // 2. Monitoring Statistics Cards
     setElemText('stat-total-detections', cumulative.total || counts.Total || 0);
+    setElemText('stat-total-detections-ai', cumulative.total || counts.Total || 0);
     setElemText('stat-people-detected', cumulative.people || counts.Person || 0);
+    setElemText('stat-people-detected-ai', cumulative.people || counts.Person || 0);
     setElemText('stat-animals-detected', cumulative.animals || counts.Animal || 0);
+    setElemText('stat-animals-detected-ai', cumulative.animals || counts.Animal || 0);
     setElemText('stat-fire-detected', cumulative.fire || counts.Fire || 0);
+    setElemText('stat-fire-detected-ai', cumulative.fire || counts.Fire || 0);
     setElemText('stat-smoke-detected', cumulative.smoke || counts.Smoke || 0);
+    setElemText('stat-smoke-detected-ai', cumulative.smoke || counts.Smoke || 0);
 
     // 3. Status Cards
-    const valPerson = document.getElementById('val-status-person');
-    const subPerson = document.getElementById('sub-status-person');
-    if (valPerson) {
-      const pCount = counts.Person || 0;
-      valPerson.textContent = pCount > 0 ? `DETECTED (${pCount})` : 'CLEAR';
-      if (subPerson) subPerson.textContent = pCount > 0 ? 'Person in frame' : 'No personnel in FOV';
-    }
+    const pCount = counts.Person || 0;
+    ['val-status-person', 'val-status-person-ai'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = pCount > 0 ? `DETECTED (${pCount})` : 'CLEAR';
+    });
+    ['sub-status-person', 'sub-status-person-ai'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = pCount > 0 ? 'Person in frame' : 'No personnel in FOV';
+    });
 
-    const valAnimal = document.getElementById('val-status-animal');
-    const subAnimal = document.getElementById('sub-status-animal');
-    if (valAnimal) {
-      const aCount = counts.Animal || 0;
-      const detections = data.detections || [];
-      const animalDets = detections.filter(d => d.category === 'Animal');
-      const speciesList = animalDets.map(d => d.class).join(', ');
-      valAnimal.textContent = aCount > 0 ? `ACTIVE (${aCount})` : 'CLEAR';
-      if (subAnimal) subAnimal.textContent = speciesList ? `Species: ${speciesList}` : 'Wildlife safe';
-    }
+    const aCount = counts.Animal || 0;
+    const detections = data.detections || [];
+    const animalDets = detections.filter(d => d.category === 'Animal');
+    const speciesList = animalDets.map(d => d.class).join(', ');
+    ['val-status-animal', 'val-status-animal-ai'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = aCount > 0 ? `ACTIVE (${aCount})` : 'CLEAR';
+    });
+    ['sub-status-animal', 'sub-status-animal-ai'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = speciesList ? `Species: ${speciesList}` : 'Wildlife safe';
+    });
 
-    const valFire = document.getElementById('val-status-fire');
-    const subFire = document.getElementById('sub-status-fire');
-    const cardFire = document.getElementById('card-fire-stat');
-    if (valFire) {
-      if (data.fire_alert_active) {
-        valFire.textContent = '! ALERT: LOCKED !';
-        valFire.style.color = '#ef4444';
-        if (cardFire) cardFire.classList.add('pulse-alert');
-      } else if ((counts.Fire || 0) > 0) {
-        valFire.textContent = `VERIFYING [${data.persistence}/${data.persistence_threshold}]`;
-        valFire.style.color = '#f59e0b';
-      } else {
-        valFire.textContent = 'CLEAR';
-        valFire.style.color = '#22c55e';
-        if (cardFire) cardFire.classList.remove('pulse-alert');
+    ['val-status-fire', 'val-status-fire-ai'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        if (data.fire_alert_active) {
+          el.textContent = '! ALERT: LOCKED !';
+          el.style.color = '#ef4444';
+        } else if ((counts.Fire || 0) > 0) {
+          el.textContent = `VERIFYING [${data.persistence}/${data.persistence_threshold}]`;
+          el.style.color = '#f59e0b';
+        } else {
+          el.textContent = 'CLEAR';
+          el.style.color = '#22c55e';
+        }
       }
-      if (subFire) subFire.textContent = `Persistence: ${data.persistence || 0}/${data.persistence_threshold || 6}`;
-    }
+    });
+    ['sub-status-fire', 'sub-status-fire-ai'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = `Persistence: ${data.persistence || 0}/${data.persistence_threshold || 6}`;
+    });
 
-    const valSmoke = document.getElementById('val-status-smoke');
-    const subSmoke = document.getElementById('sub-status-smoke');
-    if (valSmoke) {
-      const sCount = counts.Smoke || 0;
-      valSmoke.textContent = sCount > 0 ? 'PLUME DETECTED' : 'CLEAR';
-      valSmoke.style.color = sCount > 0 ? '#f59e0b' : '#22c55e';
-      if (subSmoke) subSmoke.textContent = sCount > 0 ? 'Smoke aerosol active' : 'Atmosphere clear';
-    }
+    ['card-fire-stat', 'card-fire-stat-ai'].forEach(id => {
+      const c = document.getElementById(id);
+      if (c) {
+        if (data.fire_alert_active) c.classList.add('pulse-alert');
+        else c.classList.remove('pulse-alert');
+      }
+    });
+
+    const sCount = counts.Smoke || 0;
+    ['val-status-smoke', 'val-status-smoke-ai'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.textContent = sCount > 0 ? 'PLUME DETECTED' : 'CLEAR';
+        el.style.color = sCount > 0 ? '#f59e0b' : '#22c55e';
+      }
+    });
+    ['sub-status-smoke', 'sub-status-smoke-ai'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = sCount > 0 ? 'Smoke aerosol active' : 'Atmosphere clear';
+    });
 
     // 4. Overlaid HUD banner & Persistence
-    const aiTag = document.getElementById('ai-detection-tag');
-    const targetsSummary = document.getElementById('ai-targets-summary');
-    const persTag = document.getElementById('ai-persistence-tag');
+    ['ai-targets-summary', 'ai-targets-summary-ai'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = `TARGETS: ${counts.Total || 0}`;
+    });
+    ['ai-persistence-tag', 'ai-persistence-tag-ai'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = `VERIFYING: [${data.persistence || 0}/${data.persistence_threshold || 6}]`;
+    });
 
-    if (targetsSummary) targetsSummary.textContent = `TARGETS: ${counts.Total || 0}`;
-    if (persTag) persTag.textContent = `VERIFYING: [${data.persistence || 0}/${data.persistence_threshold || 6}]`;
-
-    if (aiTag) {
-      if (data.fire_alert_active) {
-        aiTag.className = 'detection-pill alert';
-        aiTag.textContent = '! CRITICAL FIRE ALERT: LOCKED !';
-        aiTag.style.background = '#ef4444';
-        aiTag.style.color = '#ffffff';
-
-        // Trigger Audio Warning with 10s cooldown
-        const now = Date.now();
-        if (now - lastHazardAudioTime > 10000) {
-          lastHazardAudioTime = now;
-          playBuzzer(true);
-          logEvent('ALERT', 'CRITICAL FIRE DETECTED by YOLO Vision! Pilot arm and water spray enabled.');
+    ['ai-detection-tag', 'ai-detection-tag-ai'].forEach(id => {
+      const aiTag = document.getElementById(id);
+      if (aiTag) {
+        if (data.fire_alert_active) {
+          aiTag.className = 'detection-pill alert';
+          aiTag.textContent = '! CRITICAL FIRE ALERT: LOCKED !';
+          aiTag.style.background = '#ef4444';
+          aiTag.style.color = '#ffffff';
+        } else if (data.persistence > 0) {
+          aiTag.className = 'detection-pill';
+          aiTag.textContent = `AI INFERENCE: VERIFYING [${data.persistence}/${data.persistence_threshold}]`;
+          aiTag.style.background = '#f59e0b';
+          aiTag.style.color = '#000000';
+        } else {
+          aiTag.className = 'detection-pill';
+          aiTag.textContent = 'AI INFERENCE: PATROL (NORMAL)';
+          aiTag.style.background = 'rgba(255, 107, 0, 0.7)';
+          aiTag.style.color = '#ffffff';
         }
-      } else if (data.persistence > 0) {
-        aiTag.className = 'detection-pill';
-        aiTag.textContent = `AI INFERENCE: VERIFYING [${data.persistence}/${data.persistence_threshold}]`;
-        aiTag.style.background = '#f59e0b';
-        aiTag.style.color = '#000000';
-      } else {
-        aiTag.className = 'detection-pill';
-        aiTag.textContent = 'AI INFERENCE: PATROL (NORMAL)';
-        aiTag.style.background = 'rgba(255, 107, 0, 0.7)';
-        aiTag.style.color = '#ffffff';
+      }
+    });
+
+    // Audio buzzer alert with cooldown
+    if (data.fire_alert_active) {
+      const now = Date.now();
+      if (now - lastHazardAudioTime > 10000) {
+        lastHazardAudioTime = now;
+        playBuzzer(true);
+        logEvent('ALERT', 'CRITICAL FIRE DETECTED by YOLO Vision! Pilot arm and water spray enabled.');
       }
     }
 
     // Water spray button activation
-    if (btnWaterSpray && !state.waterPumpSprayActive) {
+    [btnWaterSpray, btnWaterSprayAi].forEach(btn => {
+      if (!btn || state.waterPumpSprayActive) return;
       if (data.fire_alert_active && state.isArmed) {
-        btnWaterSpray.disabled = false;
-        btnWaterSpray.textContent = 'ACTIVATE WATER SPRAY (3s)';
-        btnWaterSpray.style.background = '#ef4444';
-        btnWaterSpray.style.color = '#ffffff';
+        btn.disabled = false;
+        btn.textContent = 'ACTIVATE WATER SPRAY (3s)';
+        btn.style.background = '#ef4444';
+        btn.style.color = '#ffffff';
       } else if (data.fire_alert_active) {
-        btnWaterSpray.disabled = true;
-        btnWaterSpray.textContent = 'SPRAY (REQUIRES PILOT ARM)';
-        btnWaterSpray.style.color = '#ef4444';
+        btn.disabled = true;
+        btn.textContent = 'SPRAY (REQUIRES PILOT ARM)';
+        btn.style.color = '#ef4444';
       } else {
-        btnWaterSpray.disabled = true;
-        btnWaterSpray.textContent = 'Water Spray (DISARMED)';
-        btnWaterSpray.style.background = 'transparent';
-        btnWaterSpray.style.color = '#ef4444';
+        btn.disabled = true;
+        btn.textContent = 'Water Spray (DISARMED)';
+        btn.style.background = 'transparent';
+        btn.style.color = '#ef4444';
       }
-    }
+    });
 
     // 5. Update Detection History Table
     fetchDetectionHistory();
@@ -1469,49 +1538,60 @@ function initSimulatedCanvases() {
     fetch(`${visionBackendUrl}/api/detections?limit=15`)
       .then(res => res.json())
       .then(data => {
-        const tbody = document.getElementById('detection-history-tbody');
-        if (!tbody || !data.events || data.events.length === 0) return;
+        ['detection-history-tbody', 'detection-history-tbody-ai'].forEach(tbodyId => {
+          const tbody = document.getElementById(tbodyId);
+          if (!tbody || !data.events || data.events.length === 0) return;
 
-        let html = '';
-        data.events.forEach(ev => {
-          const sevClass = ev.alert_severity === 'CRITICAL' ? 'badge-critical' : 'badge-severity';
-          const sevStyle = ev.alert_severity === 'CRITICAL' ? 'background:#ef4444;color:#fff;' : 'background:#22c55e;color:#000;';
-          html += `<tr>
-            <td style="font-family:monospace;color:#00d4ff;">#${ev.id}</td>
-            <td style="font-family:monospace;font-size:11px;">${ev.timestamp}</td>
-            <td><b>${ev.class_name}</b></td>
-            <td><span style="color:#8a96aa;">${ev.category}</span></td>
-            <td style="font-family:monospace;color:#22c55e;">${ev.confidence}%</td>
-            <td><span class="${sevClass}" style="${sevStyle}padding:2px 6px;border-radius:4px;font-size:10px;font-weight:bold;">${ev.alert_severity}</span></td>
-            <td><span style="color:#22c55e;font-size:11px;">VERIFIED</span></td>
-          </tr>`;
+          let html = '';
+          data.events.forEach(ev => {
+            const sevClass = ev.alert_severity === 'CRITICAL' ? 'badge-critical' : 'badge-severity';
+            const sevStyle = ev.alert_severity === 'CRITICAL' ? 'background:#ef4444;color:#fff;' : 'background:#22c55e;color:#000;';
+            html += `<tr>
+              <td style="font-family:monospace;color:#00d4ff;">#${ev.id}</td>
+              <td style="font-family:monospace;font-size:11px;">${ev.timestamp}</td>
+              <td><b>${ev.class_name}</b></td>
+              <td><span style="color:#8a96aa;">${ev.category}</span></td>
+              <td style="font-family:monospace;color:#22c55e;">${ev.confidence}%</td>
+              <td><span class="${sevClass}" style="${sevStyle}padding:2px 6px;border-radius:4px;font-size:10px;font-weight:bold;">${ev.alert_severity}</span></td>
+              <td><span style="color:#22c55e;font-size:11px;">VERIFIED</span></td>
+            </tr>`;
+          });
+          tbody.innerHTML = html;
         });
-        tbody.innerHTML = html;
       })
       .catch(() => {});
   }
 
   function startVisionStream() {
     isStreamRunning = true;
-    if (streamImg) {
-      streamImg.src = `${visionBackendUrl}/api/camera/stream?annotated=${isOverlayAnnotated}&t=${Date.now()}`;
-      streamImg.style.display = 'block';
-      streamImg.onerror = () => {
-        streamImg.style.display = 'none';
-        if (canvasRgb) canvasRgb.style.display = 'none';
-        if (offlineBox) offlineBox.style.display = 'flex';
-      };
-      streamImg.onload = () => {
-        if (offlineBox) offlineBox.style.display = 'none';
-      };
-    }
+    const streamUrl = `${visionBackendUrl}/api/camera/stream?annotated=${isOverlayAnnotated}&t=${Date.now()}`;
+    
+    [streamImg, streamImgAi].forEach(img => {
+      if (img) {
+        img.src = streamUrl;
+        img.style.display = 'block';
+        img.onerror = () => {
+          img.style.display = 'none';
+          if (offlineBox) offlineBox.style.display = 'flex';
+          if (offlineBoxAi) offlineBoxAi.style.display = 'flex';
+        };
+        img.onload = () => {
+          if (offlineBox) offlineBox.style.display = 'none';
+          if (offlineBoxAi) offlineBoxAi.style.display = 'none';
+        };
+      }
+    });
+
     if (canvasRgb) canvasRgb.style.display = 'none';
     if (offlineBox) offlineBox.style.display = 'none';
+    if (offlineBoxAi) offlineBoxAi.style.display = 'none';
 
-    if (btnToggleCamera) {
-      btnToggleCamera.textContent = '⏹ Stop Live Camera';
-      btnToggleCamera.style.background = '#ef4444';
-    }
+    [btnToggleCamera, btnToggleCameraAi].forEach(btn => {
+      if (btn) {
+        btn.textContent = '⏹ Stop Live Camera';
+        btn.style.background = '#ef4444';
+      }
+    });
 
     connectVisionWebSocket();
 
@@ -1535,11 +1615,13 @@ function initSimulatedCanvases() {
               });
             }).catch(() => {});
         }).catch(() => {
-          const badgeConn = document.getElementById('cam-connection-badge');
-          if (badgeConn) {
-            badgeConn.textContent = 'OFFLINE';
-            badgeConn.style.background = '#ef4444';
-          }
+          ['cam-connection-badge', 'cam-connection-badge-ai'].forEach(id => {
+            const b = document.getElementById(id);
+            if (b) {
+              b.textContent = 'OFFLINE';
+              b.style.background = '#ef4444';
+            }
+          });
         });
     }, 1200);
 
@@ -1548,17 +1630,23 @@ function initSimulatedCanvases() {
 
   function stopVisionStream() {
     isStreamRunning = false;
-    if (streamImg) {
-      streamImg.src = '';
-      streamImg.style.display = 'none';
-    }
+    [streamImg, streamImgAi].forEach(img => {
+      if (img) {
+        img.src = '';
+        img.style.display = 'none';
+      }
+    });
+
     if (canvasRgb) canvasRgb.style.display = 'block';
     if (offlineBox) offlineBox.style.display = 'none';
+    if (offlineBoxAi) offlineBoxAi.style.display = 'none';
 
-    if (btnToggleCamera) {
-      btnToggleCamera.textContent = '▶ Start Live Camera';
-      btnToggleCamera.style.background = '#2563eb';
-    }
+    [btnToggleCamera, btnToggleCameraAi].forEach(btn => {
+      if (btn) {
+        btn.textContent = '▶ Start Live Camera';
+        btn.style.background = '#2563eb';
+      }
+    });
 
     if (visionWs) {
       try { visionWs.close(); } catch (e) {}
@@ -1572,172 +1660,222 @@ function initSimulatedCanvases() {
     logEvent('SYSTEM', 'Drone Vision stream paused. Synthetic HUD standby active.');
   }
 
-  if (btnToggleCamera) {
-    btnToggleCamera.addEventListener('click', () => {
-      if (isStreamRunning) {
-        stopVisionStream();
-      } else {
-        startVisionStream();
-      }
-    });
-  }
+  [btnToggleCamera, btnToggleCameraAi].forEach(btn => {
+    if (btn) {
+      btn.addEventListener('click', () => {
+        if (isStreamRunning) {
+          stopVisionStream();
+        } else {
+          startVisionStream();
+        }
+      });
+    }
+  });
 
-  if (btnToggleAnnotated) {
-    btnToggleAnnotated.addEventListener('click', () => {
-      isOverlayAnnotated = !isOverlayAnnotated;
-      btnToggleAnnotated.textContent = `Overlay: ${isOverlayAnnotated ? 'ANNOTATED HUD' : 'RAW FEED'}`;
-      btnToggleAnnotated.classList.toggle('active', isOverlayAnnotated);
-      if (isStreamRunning && streamImg) {
-        streamImg.src = `${visionBackendUrl}/api/camera/stream?annotated=${isOverlayAnnotated}&t=${Date.now()}`;
-      }
-    });
-  }
+  [btnToggleAnnotated, btnToggleAnnotatedAi].forEach(btn => {
+    if (btn) {
+      btn.addEventListener('click', () => {
+        isOverlayAnnotated = !isOverlayAnnotated;
+        const txt = `Overlay: ${isOverlayAnnotated ? 'ANNOTATED HUD' : 'RAW FEED'}`;
+        if (btnToggleAnnotated) {
+          btnToggleAnnotated.textContent = txt;
+          btnToggleAnnotated.classList.toggle('active', isOverlayAnnotated);
+        }
+        if (btnToggleAnnotatedAi) {
+          btnToggleAnnotatedAi.textContent = txt;
+          btnToggleAnnotatedAi.classList.toggle('active', isOverlayAnnotated);
+        }
+        if (isStreamRunning) {
+          const streamUrl = `${visionBackendUrl}/api/camera/stream?annotated=${isOverlayAnnotated}&t=${Date.now()}`;
+          if (streamImg) streamImg.src = streamUrl;
+          if (streamImgAi) streamImgAi.src = streamUrl;
+        }
+      });
+    }
+  });
 
-  if (btnFullscreen) {
-    btnFullscreen.addEventListener('click', () => {
-      const container = document.getElementById('camera-viewport-container');
-      if (!container) return;
-      if (!document.fullscreenElement) {
-        container.requestFullscreen().catch(err => alert(`Fullscreen error: ${err.message}`));
-      } else {
-        document.exitFullscreen();
-      }
-    });
-  }
+  [btnFullscreen, btnFullscreenAi].forEach(btn => {
+    if (btn) {
+      btn.addEventListener('click', () => {
+        const container = document.getElementById('camera-viewport-container-ai') || document.getElementById('camera-viewport-container');
+        if (!container) return;
+        if (!document.fullscreenElement) {
+          container.requestFullscreen().catch(err => alert(`Fullscreen error: ${err.message}`));
+        } else {
+          document.exitFullscreen();
+        }
+      });
+    }
+  });
 
-  if (btnSnapshot) {
-    btnSnapshot.addEventListener('click', () => {
-      const a = document.createElement('a');
-      a.href = `${visionBackendUrl}/api/camera/stream?annotated=${isOverlayAnnotated}&snapshot=${Date.now()}`;
-      a.target = '_blank';
-      a.click();
-      logEvent('SYSTEM', 'Camera snapshot frame captured.');
-    });
-  }
+  [btnSnapshot, btnSnapshotAi].forEach(btn => {
+    if (btn) {
+      btn.addEventListener('click', () => {
+        const a = document.createElement('a');
+        a.href = `${visionBackendUrl}/api/camera/stream?annotated=${isOverlayAnnotated}&snapshot=${Date.now()}`;
+        a.target = '_blank';
+        a.click();
+        logEvent('SYSTEM', 'Camera snapshot frame captured.');
+      });
+    }
+  });
 
-  if (selCamSource) {
-    selCamSource.addEventListener('change', (e) => {
-      const src = e.target.value;
-      if (esp32Group) {
-        esp32Group.style.display = (src === 'esp32_cam') ? 'flex' : 'none';
-      }
-      fetch(`${visionBackendUrl}/api/camera/config`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ source: src, url: inputEsp32Url ? inputEsp32Url.value : null })
-      }).then(r => r.json())
-        .then(() => {
-          logEvent('SYSTEM', `Vision source switched to: ${src.toUpperCase()}`);
-          if (isStreamRunning) startVisionStream();
-        }).catch(err => console.warn('Config update failed:', err));
-    });
-  }
+  [selCamSource, selCamSourceAi].forEach(sel => {
+    if (sel) {
+      sel.addEventListener('change', (e) => {
+        const src = e.target.value;
+        if (selCamSource) selCamSource.value = src;
+        if (selCamSourceAi) selCamSourceAi.value = src;
+        if (esp32Group) esp32Group.style.display = (src === 'esp32_cam') ? 'flex' : 'none';
+        if (esp32GroupAi) esp32GroupAi.style.display = (src === 'esp32_cam') ? 'flex' : 'none';
+        
+        const urlVal = (inputEsp32Url && inputEsp32Url.value) || (inputEsp32UrlAi && inputEsp32UrlAi.value) || null;
+        fetch(`${visionBackendUrl}/api/camera/config`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ source: src, url: urlVal })
+        }).then(r => r.json())
+          .then(() => {
+            logEvent('SYSTEM', `Vision source switched to: ${src.toUpperCase()}`);
+            if (isStreamRunning) startVisionStream();
+          }).catch(err => console.warn('Config update failed:', err));
+      });
+    }
+  });
 
-  if (btnApplyEsp32Url && inputEsp32Url) {
-    btnApplyEsp32Url.addEventListener('click', () => {
-      const url = inputEsp32Url.value.trim();
-      fetch(`${visionBackendUrl}/api/camera/config`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ source: 'esp32_cam', url: url })
-      }).then(r => r.json())
-        .then(() => {
-          logEvent('SYSTEM', `ESP32-CAM stream URL configured: ${url}`);
-          if (isStreamRunning) startVisionStream();
-        }).catch(() => alert('Could not reach backend to set ESP32-CAM URL.'));
-    });
-  }
+  [btnApplyEsp32Url, btnApplyEsp32UrlAi].forEach(btn => {
+    if (btn) {
+      btn.addEventListener('click', () => {
+        const url = ((inputEsp32Url && inputEsp32Url.value) || (inputEsp32UrlAi && inputEsp32UrlAi.value) || '').trim();
+        fetch(`${visionBackendUrl}/api/camera/config`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ source: 'esp32_cam', url: url })
+        }).then(r => r.json())
+          .then(() => {
+            logEvent('SYSTEM', `ESP32-CAM stream URL configured: ${url}`);
+            if (isStreamRunning) startVisionStream();
+          }).catch(() => alert('Could not reach backend to set ESP32-CAM URL.'));
+      });
+    }
+  });
 
   if (btnReconnectVision) {
     btnReconnectVision.addEventListener('click', () => startVisionStream());
   }
 
-  if (btnQuickSwitchSim && selCamSource) {
+  if (btnQuickSwitchSim) {
     btnQuickSwitchSim.addEventListener('click', () => {
-      selCamSource.value = 'simulation';
-      selCamSource.dispatchEvent(new Event('change'));
-    });
-  }
-
-  // Threshold controls
-  const rangeFire = document.getElementById('thresh-fire');
-  const rangeSmoke = document.getElementById('thresh-smoke');
-  const rangePerson = document.getElementById('thresh-person');
-  const rangeAnimal = document.getElementById('thresh-animal');
-
-  function bindRange(slider, labelId) {
-    if (!slider) return;
-    slider.addEventListener('input', (e) => {
-      const lbl = document.getElementById(labelId);
-      if (lbl) lbl.textContent = `${e.target.value}%`;
-    });
-  }
-  bindRange(rangeFire, 'val-thresh-fire');
-  bindRange(rangeSmoke, 'val-thresh-smoke');
-  bindRange(rangePerson, 'val-thresh-person');
-  bindRange(rangeAnimal, 'val-thresh-animal');
-
-  if (btnSaveThresholds) {
-    btnSaveThresholds.addEventListener('click', () => {
-      const payload = {
-        conf_fire: rangeFire ? parseFloat(rangeFire.value) / 100 : 0.30,
-        conf_smoke: rangeSmoke ? parseFloat(rangeSmoke.value) / 100 : 0.30,
-        conf_person: rangePerson ? parseFloat(rangePerson.value) / 100 : 0.45,
-        conf_animal: rangeAnimal ? parseFloat(rangeAnimal.value) / 100 : 0.40
-      };
-      fetch(`${visionBackendUrl}/api/detection/config`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      }).then(r => r.json())
-        .then(() => logEvent('SYSTEM', 'YOLO detection thresholds updated on backend.'))
-        .catch(e => console.warn('Threshold save error:', e));
-    });
-  }
-
-  if (btnTestAlert) {
-    btnTestAlert.addEventListener('click', () => {
-      playBuzzer(true);
-      const aiTag = document.getElementById('ai-detection-tag');
-      if (aiTag) {
-        aiTag.className = 'detection-pill alert';
-        aiTag.textContent = '! BENCH TEST FIRE ALERT: LOCKED !';
-        aiTag.style.background = '#ef4444';
-        setTimeout(() => {
-          aiTag.className = 'detection-pill';
-          aiTag.textContent = 'AI INFERENCE: PATROL (NORMAL)';
-          aiTag.style.background = 'rgba(255, 107, 0, 0.7)';
-        }, 3000);
+      if (selCamSource) {
+        selCamSource.value = 'simulation';
+        selCamSource.dispatchEvent(new Event('change'));
       }
-      logEvent('ALERT', 'Manual Alert Buzzer Test triggered by pilot.');
-    });
-  }
-
-  if (btnClearAlerts) {
-    btnClearAlerts.addEventListener('click', () => {
-      fetch(`${visionBackendUrl}/api/alerts/clear`, { method: 'POST' })
-        .then(() => logEvent('SYSTEM', 'Active fire alerts cleared by pilot.'))
-        .catch(() => {});
-    });
-  }
-
-  if (btnWaterSpray) {
-    btnWaterSpray.addEventListener('click', () => {
-      if (!state.isArmed) {
-        alert('SAFETY INTERLOCK: Pilot must ARM the drone before activating water spray!');
-        return;
+      if (selCamSourceAi) {
+        selCamSourceAi.value = 'simulation';
+        selCamSourceAi.dispatchEvent(new Event('change'));
       }
-      if (state.waterPumpCooldown > 0) {
-        alert(`PUMP COOLDOWN: Please wait ${state.waterPumpCooldown.toFixed(1)}s before next spray.`);
-        return;
-      }
-      state.waterPumpSprayActive = true;
-      state.waterPumpCountdown = 3.0;
-      logEvent('ALERT', 'WATER SPRAY ACTIVATED for 3 seconds on confirmed fire.');
-
-      fetch(`${visionBackendUrl}/api/trigger_pump`, { method: 'POST' }).catch(() => {});
     });
   }
+
+  // Threshold controls (sync both screens)
+  function bindRangePair(sliderId1, sliderId2, labelId1, labelId2) {
+    const s1 = document.getElementById(sliderId1);
+    const s2 = document.getElementById(sliderId2);
+    const l1 = document.getElementById(labelId1);
+    const l2 = document.getElementById(labelId2);
+
+    [s1, s2].forEach(slider => {
+      if (!slider) return;
+      slider.addEventListener('input', (e) => {
+        const val = e.target.value;
+        if (s1) s1.value = val;
+        if (s2) s2.value = val;
+        if (l1) l1.textContent = `${val}%`;
+        if (l2) l2.textContent = `${val}%`;
+      });
+    });
+  }
+  bindRangePair('thresh-fire', 'thresh-fire-ai', 'val-thresh-fire', 'val-thresh-fire-ai');
+  bindRangePair('thresh-smoke', 'thresh-smoke-ai', 'val-thresh-smoke', 'val-thresh-smoke-ai');
+  bindRangePair('thresh-person', 'thresh-person-ai', 'val-thresh-person', 'val-thresh-person-ai');
+  bindRangePair('thresh-animal', 'thresh-animal-ai', 'val-thresh-animal', 'val-thresh-animal-ai');
+
+  [btnSaveThresholds, btnSaveThresholdsAi].forEach(btn => {
+    if (btn) {
+      btn.addEventListener('click', () => {
+        const rangeFire = document.getElementById('thresh-fire-ai') || document.getElementById('thresh-fire');
+        const rangeSmoke = document.getElementById('thresh-smoke-ai') || document.getElementById('thresh-smoke');
+        const rangePerson = document.getElementById('thresh-person-ai') || document.getElementById('thresh-person');
+        const rangeAnimal = document.getElementById('thresh-animal-ai') || document.getElementById('thresh-animal');
+
+        const payload = {
+          conf_fire: rangeFire ? parseFloat(rangeFire.value) / 100 : 0.30,
+          conf_smoke: rangeSmoke ? parseFloat(rangeSmoke.value) / 100 : 0.30,
+          conf_person: rangePerson ? parseFloat(rangePerson.value) / 100 : 0.45,
+          conf_animal: rangeAnimal ? parseFloat(rangeAnimal.value) / 100 : 0.40
+        };
+        fetch(`${visionBackendUrl}/api/detection/config`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        }).then(r => r.json())
+          .then(() => logEvent('SYSTEM', 'YOLO detection thresholds updated on backend.'))
+          .catch(e => console.warn('Threshold save error:', e));
+      });
+    }
+  });
+
+  [btnTestAlert, btnTestAlertAi].forEach(btn => {
+    if (btn) {
+      btn.addEventListener('click', () => {
+        playBuzzer(true);
+        ['ai-detection-tag', 'ai-detection-tag-ai'].forEach(id => {
+          const aiTag = document.getElementById(id);
+          if (aiTag) {
+            aiTag.className = 'detection-pill alert';
+            aiTag.textContent = '! BENCH TEST FIRE ALERT: LOCKED !';
+            aiTag.style.background = '#ef4444';
+            setTimeout(() => {
+              aiTag.className = 'detection-pill';
+              aiTag.textContent = 'AI INFERENCE: PATROL (NORMAL)';
+              aiTag.style.background = 'rgba(255, 107, 0, 0.7)';
+            }, 3000);
+          }
+        });
+        logEvent('ALERT', 'Manual Alert Buzzer Test triggered by pilot.');
+      });
+    }
+  });
+
+  [btnClearAlerts, btnClearAlertsAi].forEach(btn => {
+    if (btn) {
+      btn.addEventListener('click', () => {
+        fetch(`${visionBackendUrl}/api/alerts/clear`, { method: 'POST' })
+          .then(() => logEvent('SYSTEM', 'Active fire alerts cleared by pilot.'))
+          .catch(() => {});
+      });
+    }
+  });
+
+  [btnWaterSpray, btnWaterSprayAi].forEach(btn => {
+    if (btn) {
+      btn.addEventListener('click', () => {
+        if (!state.isArmed) {
+          alert('SAFETY INTERLOCK: Pilot must ARM the drone before activating water spray!');
+          return;
+        }
+        if (state.waterPumpCooldown > 0) {
+          alert(`PUMP COOLDOWN: Please wait ${state.waterPumpCooldown.toFixed(1)}s before next spray.`);
+          return;
+        }
+        state.waterPumpSprayActive = true;
+        state.waterPumpCountdown = 3.0;
+        logEvent('ALERT', 'WATER SPRAY ACTIVATED for 3 seconds on confirmed fire.');
+
+        fetch(`${visionBackendUrl}/api/trigger_pump`, { method: 'POST' }).catch(() => {});
+      });
+    }
+  });
 
   // Auto-connect to local vision service if available on page load
   setTimeout(() => {

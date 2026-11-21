@@ -87,7 +87,7 @@
           <li class="nav-item" data-screen="aistream">
             <span class="nav-icon">🎯</span>
             <span class="nav-text">AI Cam Stream</span>
-            <span class="nav-badge" style="background: #22c55e; color: #000; font-size: 9px; padding: 2px 5px; border-radius: 4px; font-weight: bold;">:5050</span>
+            <span class="nav-badge" style="background: #22c55e; color: #000; font-size: 9px; padding: 2px 5px; border-radius: 4px; font-weight: bold;">LIVE AI</span>
           </li>
           <li class="nav-item" data-screen="thermal">
             <span class="nav-icon">🔥</span>
@@ -519,65 +519,258 @@
         </section>
 
         <!-- ======================================================= -->
-        <!-- SCREEN 2B: LOCAL AI CAM STREAM & FASTAPI EXPLORER -->
+        <!-- SCREEN 2B: LIVE AI CAM STREAM & YOLO DETECTION HUB -->
         <!-- ======================================================= -->
         <section id="screen-aistream" class="screen-view">
           <div class="view-header">
             <div>
-              <h2>FastAPI Vision Backend & REST API (:8000)</h2>
-              <p class="section-desc">Real-time YOLOv8 multi-class detection service, camera proxy stream, and WebSocket telemetry.</p>
+              <h2>Live AI Cam Stream & YOLO Detection Hub</h2>
+              <p class="section-desc">Real-time multi-class drone vision feed (Person, Wildlife, Fire, Smoke) with bounding boxes and hazard alerts.</p>
             </div>
             <div class="view-actions">
-              <a href="http://localhost:8000/docs" target="_blank" rel="noopener noreferrer" class="btn-primary" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px; background: #2563eb; color: #fff; padding: 8px 16px; border-radius: 6px; font-weight: 600; font-size: 13px;">
-                <span>📖</span> Swagger API Docs
-              </a>
-              <a href="http://localhost:8000/api/camera/stream?annotated=true" target="_blank" rel="noopener noreferrer" class="btn-secondary" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
-                <span>🔗</span> Raw MJPEG Stream
+              <button id="btn-toggle-camera-ai" class="btn-toggle" style="background: #2563eb; color: #fff; font-weight: 700;">▶ Start Live Camera</button>
+              <button id="btn-toggle-annotated-ai" class="btn-toggle active">Overlay: ANNOTATED HUD</button>
+              <button id="btn-camera-fullscreen-ai" class="btn-secondary">⛶ Fullscreen</button>
+              <button id="btn-cam-snapshot-ai" class="btn-secondary">📸 Snapshot</button>
+              <a href="http://localhost:8000/docs" target="_blank" rel="noopener noreferrer" class="btn-secondary" style="text-decoration: none; display: inline-flex; align-items: center; gap: 4px; font-size: 12px;">
+                <span>📖</span> Docs
               </a>
             </div>
           </div>
 
-          <div class="dashboard-split-row">
-            <div class="panel-box">
-              <div class="panel-box-header">
-                <h3>BACKEND API ENDPOINTS</h3>
-                <span class="badge-lock" style="color: #22c55e; border-color: #22c55e;">FASTAPI v2.0</span>
+          <!-- Monitoring Statistics Cards Bar -->
+          <div class="metric-grid" style="grid-template-columns: repeat(6, 1fr); margin-bottom: 16px;">
+            <div class="metric-card">
+              <div class="metric-header">
+                <span class="metric-label">TOTAL DETECTIONS</span>
+                <span class="metric-pin">ALL CLASSES</span>
               </div>
-              <div class="capability-list">
-                <div class="cap-item">
-                  <span class="cap-name"><code>GET /api/camera/status</code></span>
-                  <span class="cap-status cap-on">JSON Telemetry</span>
-                </div>
-                <div class="cap-item">
-                  <span class="cap-name"><code>GET /api/camera/stream</code></span>
-                  <span class="cap-status cap-on">MJPEG Stream</span>
-                </div>
-                <div class="cap-item">
-                  <span class="cap-name"><code>GET /api/detections</code></span>
-                  <span class="cap-status cap-on">Event Log</span>
-                </div>
-                <div class="cap-item">
-                  <span class="cap-name"><code>GET /api/detections/latest</code></span>
-                  <span class="cap-status cap-on">Live Snapshot</span>
-                </div>
-                <div class="cap-item">
-                  <span class="cap-name"><code>WebSocket /ws/detections</code></span>
-                  <span class="cap-status cap-on">10 Hz Telemetry</span>
-                </div>
+              <div class="metric-value" id="stat-total-detections-ai">0</div>
+              <div class="metric-sub">Patrol scanning</div>
+            </div>
+
+            <div class="metric-card">
+              <div class="metric-header">
+                <span class="metric-label">PEOPLE DETECTED</span>
+                <span class="metric-pin">CLASS 0</span>
+              </div>
+              <div class="metric-value" style="color: #22c55e;" id="stat-people-detected-ai">0</div>
+              <div class="metric-sub">Ground personnel</div>
+            </div>
+
+            <div class="metric-card">
+              <div class="metric-header">
+                <span class="metric-label">ANIMALS / WILDLIFE</span>
+                <span class="metric-pin">SPECIES</span>
+              </div>
+              <div class="metric-value" style="color: #00d4ff;" id="stat-animals-detected-ai">0</div>
+              <div class="metric-sub">Bird, Dog, Cat, Cow, etc.</div>
+            </div>
+
+            <div class="metric-card" id="card-fire-stat-ai">
+              <div class="metric-header">
+                <span class="metric-label">FIRE DETECTIONS</span>
+                <span class="metric-pin" style="color: #ef4444;">HAZARD</span>
+              </div>
+              <div class="metric-value" style="color: #ef4444;" id="stat-fire-detected-ai">0</div>
+              <div class="metric-sub">Active flame</div>
+            </div>
+
+            <div class="metric-card" id="card-smoke-stat-ai">
+              <div class="metric-header">
+                <span class="metric-label">SMOKE PLUMES</span>
+                <span class="metric-pin" style="color: #f59e0b;">HAZARD</span>
+              </div>
+              <div class="metric-value" style="color: #f59e0b;" id="stat-smoke-detected-ai">0</div>
+              <div class="metric-sub">Smoldering / early plume</div>
+            </div>
+
+            <div class="metric-card">
+              <div class="metric-header">
+                <span class="metric-label">STREAM UPTIME</span>
+                <span class="metric-pin">LINK</span>
+              </div>
+              <div class="metric-value" style="font-size: 18px;" id="stat-camera-uptime-ai">00:00:00</div>
+              <div class="metric-sub" id="cam-status-text-ai">Ready to stream</div>
+            </div>
+          </div>
+
+          <!-- Live Video Viewport Container -->
+          <div class="camera-canvas-container" id="camera-viewport-container-ai" style="background: #000; min-height: 520px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-subtle);">
+            <img id="drone-live-stream-img-ai" src="http://localhost:8000/api/camera/stream?annotated=true" style="width: 100%; height: 100%; max-height: 540px; object-fit: contain; border-radius: 8px; display: block;" alt="Live Drone Vision Feed" onerror="this.style.display='none'; document.getElementById('cam-fallback-box-ai').style.display='flex';">
+            
+            <!-- Fallback Standby Box if backend server is not running yet -->
+            <div id="cam-fallback-box-ai" style="display: none; flex-direction: column; align-items: center; justify-content: center; padding: 40px; text-align: center;">
+              <span style="font-size: 40px; margin-bottom: 12px;">📡</span>
+              <h3 style="color: #00d4ff; margin-bottom: 8px; font-size: 18px;">AI Drone Vision Server Standby</h3>
+              <p style="color: #8a96aa; max-width: 520px; font-size: 13px; line-height: 1.5; margin-bottom: 16px;">
+                To view the live YOLO stream here, run the launcher command in your terminal on your laptop:
+              </p>
+              <div style="background: #111722; padding: 12px 20px; border-radius: 8px; border: 1px solid #273549; margin-bottom: 18px; font-family: monospace; color: #22c55e; font-size: 14px; user-select: all; font-weight: bold;">
+                python3 run_drone_vision.py
+              </div>
+              <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;">
+                <button onclick="const img = document.getElementById('drone-live-stream-img-ai'); if (img) { img.src = 'http://localhost:8000/api/camera/stream?annotated=true&t=' + Date.now(); img.style.display='block'; document.getElementById('cam-fallback-box-ai').style.display='none'; }" class="btn-primary" style="padding: 10px 20px; font-weight: 600;">
+                  🔄 Retry Connection (:8000)
+                </button>
+                <button onclick="const img = document.getElementById('drone-live-stream-img-ai'); if (img) { img.src = 'http://localhost:5050/video_feed?' + Date.now(); img.style.display='block'; document.getElementById('cam-fallback-box-ai').style.display='none'; }" class="btn-secondary" style="padding: 10px 20px;">
+                  🚀 Try Port 5050 Feed
+                </button>
               </div>
             </div>
 
-            <div class="panel-box">
-              <div class="panel-box-header">
-                <h3>TERMINAL LAUNCH COMMANDS</h3>
-                <span class="badge-lock">LOCAL RUN</span>
+            <!-- Overlaid Tactical HUD -->
+            <div class="camera-hud-overlay" style="pointer-events: none;">
+              <div class="hud-top-left">
+                <span class="rec-dot" id="hud-rec-dot-ai"></span>
+                <span id="cam-connection-badge-ai" style="background: #22c55e; color: #000; padding: 2px 6px; border-radius: 4px; font-weight: bold; margin-right: 6px; font-size: 10px;">LIVE FEED</span>
+                <span id="hud-source-label-ai">YOLOv8 MULTI-CLASS</span>
+                <span class="fps-tag" id="cam-fps-badge-ai">30.0 FPS</span>
               </div>
-              <div style="background: #111722; padding: 14px 18px; border-radius: 8px; border: 1px solid #273549; font-family: monospace; font-size: 13px; color: #e2e8f0; line-height: 1.8;">
-                <p style="color: #8a96aa; margin-bottom: 6px;"># 1. Install dependencies:</p>
-                <div style="color: #22c55e;">pip install -r ai_pipeline/requirements.txt</div>
-                <p style="color: #8a96aa; margin: 10px 0 6px 0;"># 2. Launch FastAPI Drone Vision Service:</p>
-                <div style="color: #00d4ff;">python3 -m ai_pipeline.service.main</div>
+              <div class="hud-top-right">
+                <span id="cam-res-badge-ai" style="background: rgba(0,0,0,0.6); padding: 3px 8px; border-radius: 4px; margin-right: 8px; font-family: monospace; font-size: 11px;">640x480 VGA</span>
+                <span id="cam-frame-age-ai" style="background: rgba(0,0,0,0.6); padding: 3px 8px; border-radius: 4px; font-family: monospace; font-size: 11px;">AGE: 12ms</span>
               </div>
+              <div class="hud-center-crosshair">
+                <div class="cross-line cross-h"></div>
+                <div class="cross-line cross-v"></div>
+                <div class="cross-box"></div>
+              </div>
+              <div class="hud-bottom-bar">
+                <div id="ai-detection-tag-ai" class="detection-pill">AI INFERENCE: PATROL (NORMAL)</div>
+                <div class="hud-drone-stats">
+                  <span id="ai-targets-summary-ai" style="margin-right: 8px; font-weight: bold;">TARGETS: 0</span>
+                  <span id="ai-persistence-tag-ai">VERIFYING: [0/6]</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Camera Stream Controls Bar -->
+          <div class="camera-controls-bar" style="margin-top: 14px; flex-wrap: wrap; gap: 16px;">
+            <div class="control-item">
+              <label>Camera Source:</label>
+              <select id="select-cam-source-ai" class="tactical-select">
+                <option value="simulation" selected>🌲 Simulated Drone Patrol (Offline Ready)</option>
+                <option value="esp32_cam">📡 AI-Thinker ESP32-CAM (Wi-Fi MJPEG)</option>
+                <option value="webcam">💻 Local Laptop Camera / USB Capture</option>
+              </select>
+            </div>
+            <div class="control-item" id="esp32-url-group-ai" style="display: none;">
+              <label>ESP32-CAM Stream URL:</label>
+              <input type="text" id="input-esp32-url-ai" class="tactical-select" style="min-width: 240px; font-family: monospace; font-size: 12px;" value="http://192.168.4.2/stream">
+              <button id="btn-apply-esp32-url-ai" class="btn-primary" style="padding: 6px 12px; font-size: 12px;">Connect</button>
+            </div>
+            <div class="control-item">
+              <label>Backend URL:</label>
+              <input type="text" id="input-backend-url-ai" class="tactical-select" style="width: 170px; font-family: monospace; font-size: 12px;" value="http://localhost:8000">
+            </div>
+            <div class="control-item">
+              <label>Payload Spray:</label>
+              <button id="btn-water-spray-ai" class="btn-secondary" style="padding: 6px 14px; font-weight: 700; color: #ef4444; border-color: #ef4444;" disabled>Water Spray (DISARMED)</button>
+            </div>
+          </div>
+
+          <!-- AI Detection Status & Thresholds Panel -->
+          <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-top: 16px;">
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
+              <div class="metric-card" id="status-card-person-ai" style="border-left: 3px solid #22c55e;">
+                <div class="metric-header">
+                  <span class="metric-label">👤 PERSON STATUS</span>
+                </div>
+                <div class="metric-value" style="font-size: 18px; color: #22c55e;" id="val-status-person-ai">CLEAR</div>
+                <div class="metric-sub" id="sub-status-person-ai">Count: 0</div>
+              </div>
+
+              <div class="metric-card" id="status-card-animal-ai" style="border-left: 3px solid #00d4ff;">
+                <div class="metric-header">
+                  <span class="metric-label">🐾 WILDLIFE / ANIMAL</span>
+                </div>
+                <div class="metric-value" style="font-size: 18px; color: #00d4ff;" id="val-status-animal-ai">CLEAR</div>
+                <div class="metric-sub" id="sub-status-animal-ai">Species: None</div>
+              </div>
+
+              <div class="metric-card" id="status-card-fire-ai" style="border-left: 3px solid #ef4444;">
+                <div class="metric-header">
+                  <span class="metric-label">🔥 FIRE HAZARD</span>
+                </div>
+                <div class="metric-value" style="font-size: 18px; color: #ef4444;" id="val-status-fire-ai">CLEAR</div>
+                <div class="metric-sub" id="sub-status-fire-ai">Thermal lock: None</div>
+              </div>
+
+              <div class="metric-card" id="status-card-smoke-ai" style="border-left: 3px solid #f59e0b;">
+                <div class="metric-header">
+                  <span class="metric-label">💨 SMOKE HAZARD</span>
+                </div>
+                <div class="metric-value" style="font-size: 18px; color: #f59e0b;" id="val-status-smoke-ai">CLEAR</div>
+                <div class="metric-sub" id="sub-status-smoke-ai">Plume index: Normal</div>
+              </div>
+            </div>
+
+            <!-- Per-Class Confidence Threshold Controls -->
+            <div class="metric-card" style="padding: 14px 18px;">
+              <div class="metric-header" style="margin-bottom: 8px;">
+                <span class="metric-label">CONFIDENCE THRESHOLDS</span>
+                <button id="btn-save-thresholds-ai" class="btn-text-action" style="font-size: 11px;">Update</button>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 8px; font-size: 11px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span>🔥 Fire Conf:</span>
+                  <input type="range" id="thresh-fire-ai" min="15" max="90" value="30" style="width: 110px;">
+                  <span id="val-thresh-fire-ai" style="font-family: monospace; width: 32px; text-align: right;">30%</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span>💨 Smoke Conf:</span>
+                  <input type="range" id="thresh-smoke-ai" min="15" max="90" value="30" style="width: 110px;">
+                  <span id="val-thresh-smoke-ai" style="font-family: monospace; width: 32px; text-align: right;">30%</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span>👤 Person Conf:</span>
+                  <input type="range" id="thresh-person-ai" min="20" max="90" value="45" style="width: 110px;">
+                  <span id="val-thresh-person-ai" style="font-family: monospace; width: 32px; text-align: right;">45%</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span>🐾 Animal Conf:</span>
+                  <input type="range" id="thresh-animal-ai" min="20" max="90" value="40" style="width: 110px;">
+                  <span id="val-thresh-animal-ai" style="font-family: monospace; width: 32px; text-align: right;">40%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Detection Event History & Alerts Table -->
+          <div class="panel-box" style="margin-top: 16px;">
+            <div class="panel-box-header" style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <h3>LIVE DETECTION EVENT HISTORY & ALERTS</h3>
+                <p style="color: #8a96aa; font-size: 12px; margin-top: 2px;">Chronological verified detections with cooldown protection.</p>
+              </div>
+              <div style="display: flex; gap: 10px;">
+                <button id="btn-test-alert-ai" class="btn-secondary" style="padding: 6px 12px; font-size: 11px;">🔔 Test Alert Buzzer</button>
+                <button id="btn-clear-alerts-ai" class="btn-secondary" style="padding: 6px 12px; font-size: 11px;">🧹 Clear Alerts</button>
+              </div>
+            </div>
+            <div class="table-container" style="max-height: 260px; overflow-y: auto;">
+              <table class="tactical-table">
+                <thead>
+                  <tr>
+                    <th># ID</th>
+                    <th>TIMESTAMP</th>
+                    <th>TARGET CLASS</th>
+                    <th>CATEGORY</th>
+                    <th>CONFIDENCE</th>
+                    <th>SEVERITY</th>
+                    <th>STATUS</th>
+                  </tr>
+                </thead>
+                <tbody id="detection-history-tbody-ai">
+                  <tr>
+                    <td colspan="7" style="text-align: center; color: #8a96aa; padding: 24px;">
+                      No detection events recorded yet. Video stream active.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </section>
