@@ -1764,6 +1764,33 @@ function initSimulatedCanvases() {
     btnReconnectVision.addEventListener('click', () => startVisionStream());
   }
 
+  const btnRetry8000 = document.getElementById('btn-retry-stream-8000');
+  if (btnRetry8000) {
+    btnRetry8000.addEventListener('click', () => {
+      const stream = document.getElementById('drone-live-stream-img-ai');
+      const fallback = document.getElementById('cam-fallback-box-ai');
+      if (stream) {
+        stream.src = `${visionBackendUrl}/api/camera/stream?annotated=true&t=${Date.now()}`;
+        stream.style.display = 'block';
+      }
+      if (fallback) fallback.style.display = 'none';
+      startVisionStream();
+    });
+  }
+
+  const btnRetry5050 = document.getElementById('btn-retry-stream-5050');
+  if (btnRetry5050) {
+    btnRetry5050.addEventListener('click', () => {
+      const stream = document.getElementById('drone-live-stream-img-ai');
+      const fallback = document.getElementById('cam-fallback-box-ai');
+      if (stream) {
+        stream.src = `http://localhost:5050/video_feed?${Date.now()}`;
+        stream.style.display = 'block';
+      }
+      if (fallback) fallback.style.display = 'none';
+    });
+  }
+
   if (btnQuickSwitchSim) {
     btnQuickSwitchSim.addEventListener('click', () => {
       if (selCamSource) {

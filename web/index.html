@@ -610,10 +610,10 @@
                 python3 run_drone_vision.py
               </div>
               <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;">
-                <button onclick="const img = document.getElementById('drone-live-stream-img-ai'); if (img) { img.src = 'http://localhost:8000/api/camera/stream?annotated=true&t=' + Date.now(); img.style.display='block'; document.getElementById('cam-fallback-box-ai').style.display='none'; }" class="btn-primary" style="padding: 10px 20px; font-weight: 600;">
+                <button id="btn-retry-stream-8000" class="btn-primary" style="padding: 10px 20px; font-weight: 600;">
                   🔄 Retry Connection (:8000)
                 </button>
-                <button onclick="const img = document.getElementById('drone-live-stream-img-ai'); if (img) { img.src = 'http://localhost:5050/video_feed?' + Date.now(); img.style.display='block'; document.getElementById('cam-fallback-box-ai').style.display='none'; }" class="btn-secondary" style="padding: 10px 20px;">
+                <button id="btn-retry-stream-5050" class="btn-secondary" style="padding: 10px 20px;">
                   🚀 Try Port 5050 Feed
                 </button>
               </div>
