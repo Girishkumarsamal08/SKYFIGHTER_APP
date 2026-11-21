@@ -855,6 +855,24 @@ html, body {
   box-shadow: 0 0 12px rgba(255, 107, 0, 0.5);
 }
 
+.detection-pill.alert {
+  background: var(--accent-fire);
+  color: #ffffff;
+  border-color: #ffffff;
+  box-shadow: 0 0 16px rgba(255, 59, 48, 0.8);
+}
+
+@keyframes pulseAlert {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); border-color: rgba(239, 68, 68, 0.8); }
+  70% { box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); border-color: rgba(239, 68, 68, 1); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); border-color: rgba(239, 68, 68, 0.8); }
+}
+
+.pulse-alert {
+  animation: pulseAlert 1.5s infinite;
+  border: 1px solid #ef4444 !important;
+}
+
 .hud-drone-stats {
   font-family: var(--font-mono);
   font-size: 11px;

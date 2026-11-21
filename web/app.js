@@ -1239,88 +1239,485 @@ function initSimulatedCanvases() {
     });
   }
 
-  // Camera Setup and Toggle Handling
-  const btnToggleCamera = document.getElementById('btn-toggle-camera');
-  const selCamSource = document.getElementById('select-cam-source');
-  const simGroup = document.getElementById('sim-scenario-group');
-  const btnWaterSpray = document.getElementById('btn-water-spray');
-  const videoEl = document.getElementById('webcam-video');
-  const pyImg = document.getElementById('py-stream-img');
+  // ========================================================
+  // DRONE VISION & AI OBJECT DETECTION SUITE
+  // ========================================================
+  let visionBackendUrl = localStorage.getItem('skyfighter_backend_url') || 'http://localhost:8000';
+  let isStreamRunning = false;
+  let isOverlayAnnotated = true;
+  let visionWs = null;
+  let visionPollTimer = null;
+  let lastHazardAudioTime = 0;
 
-  async function startCamera() {
-    if (state.cameraSource === 'webcam') {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: { ideal: 1280 }, height: { ideal: 720 } }
-        });
-        state.cameraStream = stream;
-        if (videoEl) {
-          videoEl.srcObject = stream;
-          videoEl.play();
+  const streamImg = document.getElementById('drone-live-stream-img');
+  const offlineBox = document.getElementById('cam-offline-box');
+  const btnToggleCamera = document.getElementById('btn-toggle-camera');
+  const btnToggleAnnotated = document.getElementById('btn-toggle-annotated');
+  const btnFullscreen = document.getElementById('btn-camera-fullscreen');
+  const btnSnapshot = document.getElementById('btn-cam-snapshot');
+  const selCamSource = document.getElementById('select-cam-source');
+  const esp32Group = document.getElementById('esp32-url-group');
+  const inputEsp32Url = document.getElementById('input-esp32-url');
+  const btnApplyEsp32Url = document.getElementById('btn-apply-esp32-url');
+  const inputBackendUrl = document.getElementById('input-backend-url');
+  const btnReconnectVision = document.getElementById('btn-reconnect-vision');
+  const btnQuickSwitchSim = document.getElementById('btn-quick-switch-sim');
+  const btnSaveThresholds = document.getElementById('btn-save-thresholds');
+  const btnTestAlert = document.getElementById('btn-test-alert');
+  const btnClearAlerts = document.getElementById('btn-clear-alerts');
+  const btnWaterSpray = document.getElementById('btn-water-spray');
+
+  if (inputBackendUrl) {
+    inputBackendUrl.value = visionBackendUrl;
+    inputBackendUrl.addEventListener('change', (e) => {
+      visionBackendUrl = e.target.value.trim().replace(/\/+$/, '');
+      localStorage.setItem('skyfighter_backend_url', visionBackendUrl);
+      logEvent('SYSTEM', `Drone Vision backend URL updated: ${visionBackendUrl}`);
+      if (isStreamRunning) startVisionStream();
+    });
+  }
+
+  function formatUptime(seconds) {
+    const s = Math.floor(seconds % 60);
+    const m = Math.floor((seconds / 60) % 60);
+    const h = Math.floor(seconds / 3600);
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  }
+
+  function connectVisionWebSocket() {
+    if (visionWs) {
+      try { visionWs.close(); } catch (e) {}
+      visionWs = null;
+    }
+
+    try {
+      const wsUrl = visionBackendUrl.replace(/^http/, 'ws') + '/ws/detections';
+      visionWs = new WebSocket(wsUrl);
+
+      visionWs.onopen = () => {
+        const badge = document.getElementById('cam-connection-badge');
+        if (badge) {
+          badge.textContent = 'ONLINE';
+          badge.style.background = '#22c55e';
         }
-        state.cameraActive = true;
-        if (btnToggleCamera) {
-          btnToggleCamera.textContent = '⏹ Stop Camera';
-          btnToggleCamera.style.background = '#ef4444';
+      };
+
+      visionWs.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'telemetry') {
+            updateVisionUI(data);
+          }
+        } catch (e) {}
+      };
+
+      visionWs.onerror = () => {
+        const badge = document.getElementById('cam-connection-badge');
+        if (badge) {
+          badge.textContent = 'CONNECTING...';
+          badge.style.background = '#f59e0b';
         }
-        logEvent('SYSTEM', 'Laptop video camera connected.');
-      } catch (err) {
-        console.error('Camera access error:', err);
-        alert('Could not access camera: ' + err.message + '\nPlease check camera permissions in your browser or macOS settings.');
-        state.cameraActive = false;
-      }
-    } else if (state.cameraSource === 'python_gcs') {
-      if (pyImg) {
-        pyImg.src = 'http://localhost:5050/video_feed?' + Date.now();
-      }
-      state.cameraActive = true;
-      if (btnToggleCamera) {
-        btnToggleCamera.textContent = '⏹ Disconnect GCS';
-        btnToggleCamera.style.background = '#ef4444';
-      }
-      logEvent('SYSTEM', 'Connecting to Python YOLO GCS on http://localhost:5050/video_feed');
-    } else {
-      state.cameraActive = true;
-      if (btnToggleCamera) {
-        btnToggleCamera.textContent = '⏹ Stop Sim';
-        btnToggleCamera.style.background = '#ef4444';
-      }
+      };
+
+      visionWs.onclose = () => {
+        // Will be reconnected by periodic polling loop if needed
+      };
+    } catch (err) {
+      console.warn('Vision WebSocket unavailable:', err);
     }
   }
 
-  function stopCamera() {
-    if (state.cameraStream) {
-      state.cameraStream.getTracks().forEach(track => track.stop());
-      state.cameraStream = null;
+  function updateVisionUI(data) {
+    const cam = data.camera || {};
+    const counts = data.counts || {};
+    const cumulative = data.cumulative || {};
+
+    // 1. Connection & HUD Badges
+    const badgeConn = document.getElementById('cam-connection-badge');
+    const badgeFps = document.getElementById('cam-fps-badge');
+    const badgeRes = document.getElementById('cam-res-badge');
+    const badgeAge = document.getElementById('cam-frame-age');
+    const sourceLabel = document.getElementById('hud-source-label');
+    const uptimeLabel = document.getElementById('stat-camera-uptime');
+    const statusText = document.getElementById('cam-status-text');
+
+    if (badgeConn) {
+      badgeConn.textContent = cam.connected ? 'ONLINE' : 'CONNECTING...';
+      badgeConn.style.background = cam.connected ? '#22c55e' : '#f59e0b';
     }
-    if (videoEl) videoEl.srcObject = null;
-    if (pyImg) pyImg.src = '';
-    state.cameraActive = false;
+    if (badgeFps) badgeFps.textContent = `${(cam.fps || 0).toFixed(1)} FPS`;
+    if (badgeRes && cam.resolution) badgeRes.textContent = `${cam.resolution[0]}x${cam.resolution[1]}`;
+    if (badgeAge) badgeAge.textContent = `AGE: ${cam.last_frame_age_ms || 0}ms`;
+    if (sourceLabel) sourceLabel.textContent = `SRC: ${(cam.source || 'STREAM').toUpperCase()}`;
+    if (uptimeLabel && cam.uptime_seconds) uptimeLabel.textContent = formatUptime(cam.uptime_seconds);
+    if (statusText) statusText.textContent = cam.connected ? 'Live video link verified' : 'Connecting to source';
+
+    // 2. Monitoring Statistics Cards
+    setElemText('stat-total-detections', cumulative.total || counts.Total || 0);
+    setElemText('stat-people-detected', cumulative.people || counts.Person || 0);
+    setElemText('stat-animals-detected', cumulative.animals || counts.Animal || 0);
+    setElemText('stat-fire-detected', cumulative.fire || counts.Fire || 0);
+    setElemText('stat-smoke-detected', cumulative.smoke || counts.Smoke || 0);
+
+    // 3. Status Cards
+    const valPerson = document.getElementById('val-status-person');
+    const subPerson = document.getElementById('sub-status-person');
+    if (valPerson) {
+      const pCount = counts.Person || 0;
+      valPerson.textContent = pCount > 0 ? `DETECTED (${pCount})` : 'CLEAR';
+      if (subPerson) subPerson.textContent = pCount > 0 ? 'Person in frame' : 'No personnel in FOV';
+    }
+
+    const valAnimal = document.getElementById('val-status-animal');
+    const subAnimal = document.getElementById('sub-status-animal');
+    if (valAnimal) {
+      const aCount = counts.Animal || 0;
+      const detections = data.detections || [];
+      const animalDets = detections.filter(d => d.category === 'Animal');
+      const speciesList = animalDets.map(d => d.class).join(', ');
+      valAnimal.textContent = aCount > 0 ? `ACTIVE (${aCount})` : 'CLEAR';
+      if (subAnimal) subAnimal.textContent = speciesList ? `Species: ${speciesList}` : 'Wildlife safe';
+    }
+
+    const valFire = document.getElementById('val-status-fire');
+    const subFire = document.getElementById('sub-status-fire');
+    const cardFire = document.getElementById('card-fire-stat');
+    if (valFire) {
+      if (data.fire_alert_active) {
+        valFire.textContent = '! ALERT: LOCKED !';
+        valFire.style.color = '#ef4444';
+        if (cardFire) cardFire.classList.add('pulse-alert');
+      } else if ((counts.Fire || 0) > 0) {
+        valFire.textContent = `VERIFYING [${data.persistence}/${data.persistence_threshold}]`;
+        valFire.style.color = '#f59e0b';
+      } else {
+        valFire.textContent = 'CLEAR';
+        valFire.style.color = '#22c55e';
+        if (cardFire) cardFire.classList.remove('pulse-alert');
+      }
+      if (subFire) subFire.textContent = `Persistence: ${data.persistence || 0}/${data.persistence_threshold || 6}`;
+    }
+
+    const valSmoke = document.getElementById('val-status-smoke');
+    const subSmoke = document.getElementById('sub-status-smoke');
+    if (valSmoke) {
+      const sCount = counts.Smoke || 0;
+      valSmoke.textContent = sCount > 0 ? 'PLUME DETECTED' : 'CLEAR';
+      valSmoke.style.color = sCount > 0 ? '#f59e0b' : '#22c55e';
+      if (subSmoke) subSmoke.textContent = sCount > 0 ? 'Smoke aerosol active' : 'Atmosphere clear';
+    }
+
+    // 4. Overlaid HUD banner & Persistence
+    const aiTag = document.getElementById('ai-detection-tag');
+    const targetsSummary = document.getElementById('ai-targets-summary');
+    const persTag = document.getElementById('ai-persistence-tag');
+
+    if (targetsSummary) targetsSummary.textContent = `TARGETS: ${counts.Total || 0}`;
+    if (persTag) persTag.textContent = `VERIFYING: [${data.persistence || 0}/${data.persistence_threshold || 6}]`;
+
+    if (aiTag) {
+      if (data.fire_alert_active) {
+        aiTag.className = 'detection-pill alert';
+        aiTag.textContent = '! CRITICAL FIRE ALERT: LOCKED !';
+        aiTag.style.background = '#ef4444';
+        aiTag.style.color = '#ffffff';
+
+        // Trigger Audio Warning with 10s cooldown
+        const now = Date.now();
+        if (now - lastHazardAudioTime > 10000) {
+          lastHazardAudioTime = now;
+          playBuzzer(true);
+          logEvent('ALERT', 'CRITICAL FIRE DETECTED by YOLO Vision! Pilot arm and water spray enabled.');
+        }
+      } else if (data.persistence > 0) {
+        aiTag.className = 'detection-pill';
+        aiTag.textContent = `AI INFERENCE: VERIFYING [${data.persistence}/${data.persistence_threshold}]`;
+        aiTag.style.background = '#f59e0b';
+        aiTag.style.color = '#000000';
+      } else {
+        aiTag.className = 'detection-pill';
+        aiTag.textContent = 'AI INFERENCE: PATROL (NORMAL)';
+        aiTag.style.background = 'rgba(255, 107, 0, 0.7)';
+        aiTag.style.color = '#ffffff';
+      }
+    }
+
+    // Water spray button activation
+    if (btnWaterSpray && !state.waterPumpSprayActive) {
+      if (data.fire_alert_active && state.isArmed) {
+        btnWaterSpray.disabled = false;
+        btnWaterSpray.textContent = 'ACTIVATE WATER SPRAY (3s)';
+        btnWaterSpray.style.background = '#ef4444';
+        btnWaterSpray.style.color = '#ffffff';
+      } else if (data.fire_alert_active) {
+        btnWaterSpray.disabled = true;
+        btnWaterSpray.textContent = 'SPRAY (REQUIRES PILOT ARM)';
+        btnWaterSpray.style.color = '#ef4444';
+      } else {
+        btnWaterSpray.disabled = true;
+        btnWaterSpray.textContent = 'Water Spray (DISARMED)';
+        btnWaterSpray.style.background = 'transparent';
+        btnWaterSpray.style.color = '#ef4444';
+      }
+    }
+
+    // 5. Update Detection History Table
+    fetchDetectionHistory();
+  }
+
+  function fetchDetectionHistory() {
+    fetch(`${visionBackendUrl}/api/detections?limit=15`)
+      .then(res => res.json())
+      .then(data => {
+        const tbody = document.getElementById('detection-history-tbody');
+        if (!tbody || !data.events || data.events.length === 0) return;
+
+        let html = '';
+        data.events.forEach(ev => {
+          const sevClass = ev.alert_severity === 'CRITICAL' ? 'badge-critical' : 'badge-severity';
+          const sevStyle = ev.alert_severity === 'CRITICAL' ? 'background:#ef4444;color:#fff;' : 'background:#22c55e;color:#000;';
+          html += `<tr>
+            <td style="font-family:monospace;color:#00d4ff;">#${ev.id}</td>
+            <td style="font-family:monospace;font-size:11px;">${ev.timestamp}</td>
+            <td><b>${ev.class_name}</b></td>
+            <td><span style="color:#8a96aa;">${ev.category}</span></td>
+            <td style="font-family:monospace;color:#22c55e;">${ev.confidence}%</td>
+            <td><span class="${sevClass}" style="${sevStyle}padding:2px 6px;border-radius:4px;font-size:10px;font-weight:bold;">${ev.alert_severity}</span></td>
+            <td><span style="color:#22c55e;font-size:11px;">VERIFIED</span></td>
+          </tr>`;
+        });
+        tbody.innerHTML = html;
+      })
+      .catch(() => {});
+  }
+
+  function startVisionStream() {
+    isStreamRunning = true;
+    if (streamImg) {
+      streamImg.src = `${visionBackendUrl}/api/camera/stream?annotated=${isOverlayAnnotated}&t=${Date.now()}`;
+      streamImg.style.display = 'block';
+      streamImg.onerror = () => {
+        streamImg.style.display = 'none';
+        if (canvasRgb) canvasRgb.style.display = 'none';
+        if (offlineBox) offlineBox.style.display = 'flex';
+      };
+      streamImg.onload = () => {
+        if (offlineBox) offlineBox.style.display = 'none';
+      };
+    }
+    if (canvasRgb) canvasRgb.style.display = 'none';
+    if (offlineBox) offlineBox.style.display = 'none';
+
+    if (btnToggleCamera) {
+      btnToggleCamera.textContent = '⏹ Stop Live Camera';
+      btnToggleCamera.style.background = '#ef4444';
+    }
+
+    connectVisionWebSocket();
+
+    // Heartbeat fallback polling (in case WebSocket is blocked by proxy)
+    if (visionPollTimer) clearInterval(visionPollTimer);
+    visionPollTimer = setInterval(() => {
+      fetch(`${visionBackendUrl}/api/camera/status`)
+        .then(r => r.json())
+        .then(camStatus => {
+          fetch(`${visionBackendUrl}/api/detections/latest`)
+            .then(r => r.json())
+            .then(detLatest => {
+              updateVisionUI({
+                camera: camStatus,
+                detections: detLatest.active_detections,
+                counts: detLatest.counts,
+                persistence: detLatest.persistence,
+                persistence_threshold: detLatest.persistence_threshold,
+                fire_alert_active: detLatest.fire_alert_active,
+                cumulative: detLatest.cumulative_statistics
+              });
+            }).catch(() => {});
+        }).catch(() => {
+          const badgeConn = document.getElementById('cam-connection-badge');
+          if (badgeConn) {
+            badgeConn.textContent = 'OFFLINE';
+            badgeConn.style.background = '#ef4444';
+          }
+        });
+    }, 1200);
+
+    logEvent('SYSTEM', `Drone Vision live stream connected to ${visionBackendUrl}/api/camera/stream`);
+  }
+
+  function stopVisionStream() {
+    isStreamRunning = false;
+    if (streamImg) {
+      streamImg.src = '';
+      streamImg.style.display = 'none';
+    }
+    if (canvasRgb) canvasRgb.style.display = 'block';
+    if (offlineBox) offlineBox.style.display = 'none';
+
     if (btnToggleCamera) {
       btnToggleCamera.textContent = '▶ Start Live Camera';
       btnToggleCamera.style.background = '#2563eb';
     }
-    logEvent('SYSTEM', 'Camera stream disconnected.');
+
+    if (visionWs) {
+      try { visionWs.close(); } catch (e) {}
+      visionWs = null;
+    }
+    if (visionPollTimer) {
+      clearInterval(visionPollTimer);
+      visionPollTimer = null;
+    }
+
+    logEvent('SYSTEM', 'Drone Vision stream paused. Synthetic HUD standby active.');
   }
 
   if (btnToggleCamera) {
     btnToggleCamera.addEventListener('click', () => {
-      if (state.cameraActive) {
-        stopCamera();
+      if (isStreamRunning) {
+        stopVisionStream();
       } else {
-        startCamera();
+        startVisionStream();
       }
+    });
+  }
+
+  if (btnToggleAnnotated) {
+    btnToggleAnnotated.addEventListener('click', () => {
+      isOverlayAnnotated = !isOverlayAnnotated;
+      btnToggleAnnotated.textContent = `Overlay: ${isOverlayAnnotated ? 'ANNOTATED HUD' : 'RAW FEED'}`;
+      btnToggleAnnotated.classList.toggle('active', isOverlayAnnotated);
+      if (isStreamRunning && streamImg) {
+        streamImg.src = `${visionBackendUrl}/api/camera/stream?annotated=${isOverlayAnnotated}&t=${Date.now()}`;
+      }
+    });
+  }
+
+  if (btnFullscreen) {
+    btnFullscreen.addEventListener('click', () => {
+      const container = document.getElementById('camera-viewport-container');
+      if (!container) return;
+      if (!document.fullscreenElement) {
+        container.requestFullscreen().catch(err => alert(`Fullscreen error: ${err.message}`));
+      } else {
+        document.exitFullscreen();
+      }
+    });
+  }
+
+  if (btnSnapshot) {
+    btnSnapshot.addEventListener('click', () => {
+      const a = document.createElement('a');
+      a.href = `${visionBackendUrl}/api/camera/stream?annotated=${isOverlayAnnotated}&snapshot=${Date.now()}`;
+      a.target = '_blank';
+      a.click();
+      logEvent('SYSTEM', 'Camera snapshot frame captured.');
     });
   }
 
   if (selCamSource) {
     selCamSource.addEventListener('change', (e) => {
-      stopCamera();
-      state.cameraSource = e.target.value;
-      if (simGroup) {
-        simGroup.style.display = state.cameraSource === 'simulation' ? 'flex' : 'none';
+      const src = e.target.value;
+      if (esp32Group) {
+        esp32Group.style.display = (src === 'esp32_cam') ? 'flex' : 'none';
       }
-      logEvent('SYSTEM', `Camera source switched to: ${state.cameraSource}`);
+      fetch(`${visionBackendUrl}/api/camera/config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source: src, url: inputEsp32Url ? inputEsp32Url.value : null })
+      }).then(r => r.json())
+        .then(() => {
+          logEvent('SYSTEM', `Vision source switched to: ${src.toUpperCase()}`);
+          if (isStreamRunning) startVisionStream();
+        }).catch(err => console.warn('Config update failed:', err));
+    });
+  }
+
+  if (btnApplyEsp32Url && inputEsp32Url) {
+    btnApplyEsp32Url.addEventListener('click', () => {
+      const url = inputEsp32Url.value.trim();
+      fetch(`${visionBackendUrl}/api/camera/config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source: 'esp32_cam', url: url })
+      }).then(r => r.json())
+        .then(() => {
+          logEvent('SYSTEM', `ESP32-CAM stream URL configured: ${url}`);
+          if (isStreamRunning) startVisionStream();
+        }).catch(() => alert('Could not reach backend to set ESP32-CAM URL.'));
+    });
+  }
+
+  if (btnReconnectVision) {
+    btnReconnectVision.addEventListener('click', () => startVisionStream());
+  }
+
+  if (btnQuickSwitchSim && selCamSource) {
+    btnQuickSwitchSim.addEventListener('click', () => {
+      selCamSource.value = 'simulation';
+      selCamSource.dispatchEvent(new Event('change'));
+    });
+  }
+
+  // Threshold controls
+  const rangeFire = document.getElementById('thresh-fire');
+  const rangeSmoke = document.getElementById('thresh-smoke');
+  const rangePerson = document.getElementById('thresh-person');
+  const rangeAnimal = document.getElementById('thresh-animal');
+
+  function bindRange(slider, labelId) {
+    if (!slider) return;
+    slider.addEventListener('input', (e) => {
+      const lbl = document.getElementById(labelId);
+      if (lbl) lbl.textContent = `${e.target.value}%`;
+    });
+  }
+  bindRange(rangeFire, 'val-thresh-fire');
+  bindRange(rangeSmoke, 'val-thresh-smoke');
+  bindRange(rangePerson, 'val-thresh-person');
+  bindRange(rangeAnimal, 'val-thresh-animal');
+
+  if (btnSaveThresholds) {
+    btnSaveThresholds.addEventListener('click', () => {
+      const payload = {
+        conf_fire: rangeFire ? parseFloat(rangeFire.value) / 100 : 0.30,
+        conf_smoke: rangeSmoke ? parseFloat(rangeSmoke.value) / 100 : 0.30,
+        conf_person: rangePerson ? parseFloat(rangePerson.value) / 100 : 0.45,
+        conf_animal: rangeAnimal ? parseFloat(rangeAnimal.value) / 100 : 0.40
+      };
+      fetch(`${visionBackendUrl}/api/detection/config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).then(r => r.json())
+        .then(() => logEvent('SYSTEM', 'YOLO detection thresholds updated on backend.'))
+        .catch(e => console.warn('Threshold save error:', e));
+    });
+  }
+
+  if (btnTestAlert) {
+    btnTestAlert.addEventListener('click', () => {
+      playBuzzer(true);
+      const aiTag = document.getElementById('ai-detection-tag');
+      if (aiTag) {
+        aiTag.className = 'detection-pill alert';
+        aiTag.textContent = '! BENCH TEST FIRE ALERT: LOCKED !';
+        aiTag.style.background = '#ef4444';
+        setTimeout(() => {
+          aiTag.className = 'detection-pill';
+          aiTag.textContent = 'AI INFERENCE: PATROL (NORMAL)';
+          aiTag.style.background = 'rgba(255, 107, 0, 0.7)';
+        }, 3000);
+      }
+      logEvent('ALERT', 'Manual Alert Buzzer Test triggered by pilot.');
+    });
+  }
+
+  if (btnClearAlerts) {
+    btnClearAlerts.addEventListener('click', () => {
+      fetch(`${visionBackendUrl}/api/alerts/clear`, { method: 'POST' })
+        .then(() => logEvent('SYSTEM', 'Active fire alerts cleared by pilot.'))
+        .catch(() => {});
     });
   }
 
@@ -1338,11 +1735,22 @@ function initSimulatedCanvases() {
       state.waterPumpCountdown = 3.0;
       logEvent('ALERT', 'WATER SPRAY ACTIVATED for 3 seconds on confirmed fire.');
 
-      // Also notify Python backend if running
-      fetch('http://localhost:5050/api/trigger_pump', { method: 'POST' })
-        .catch(() => fetch('http://localhost:5000/api/trigger_pump', { method: 'POST' }).catch(() => {}));
+      fetch(`${visionBackendUrl}/api/trigger_pump`, { method: 'POST' }).catch(() => {});
     });
   }
+
+  // Auto-connect to local vision service if available on page load
+  setTimeout(() => {
+    fetch(`${visionBackendUrl}/api/camera/status`)
+      .then(res => res.json())
+      .then(() => {
+        console.log('[DroneVision] Local vision service detected. Starting stream...');
+        startVisionStream();
+      })
+      .catch(() => {
+        console.log('[DroneVision] Vision service offline. Standby mode active.');
+      });
+  }, 1000);
 }
 
 // ========================================================
