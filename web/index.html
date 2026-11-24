@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>SKYFIGHTER — Forest Fire Drone Ground Control Station</title>
+  <title>FIRE GUARDIAN — AI Forest Surveillance & Environmental Monitoring</title>
   
-  <meta name="description" content="Cross-platform UAV Ground Control Station for real-time forest fire detection, dual-band thermal/RGB monitoring, and sensor telemetry.">
+  <meta name="description" content="Unified real-time forest monitoring dashboard with ESP32 environmental sensors, live ESP32-CAM streaming, pseudo-thermal imaging, and AI wildlife threat intelligence.">
   <meta name="theme-color" content="#ff3b30">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="SKYFIGHTER">
+  <meta name="apple-mobile-web-app-title" content="FIRE GUARDIAN">
   
   <!-- Favicon & PWA Icons -->
   <link rel="icon" type="image/png" href="./icons/favicon.png">
@@ -26,13 +26,13 @@
     <header class="hud-header" id="hud-header">
       <div class="header-left">
         <div class="brand-badge">
-          <img src="./icons/favicon.png" alt="Skyfighter Icon" class="brand-icon">
+          <img src="./icons/favicon.png" alt="Fire Guardian Icon" class="brand-icon">
           <div class="brand-text">
-            <span class="brand-title">SKYFIGHTER</span>
-            <span class="brand-sub">TACTICAL GCS v1.1</span>
+            <span class="brand-title">FIRE GUARDIAN</span>
+            <span class="brand-sub">SURVEILLANCE &amp; AI GCS v2.0</span>
           </div>
         </div>
-        <div id="sim-badge" class="sim-pill disconnected">DRONE NOT CONNECTED</div>
+        <div id="sim-badge" class="sim-pill disconnected">ESP32 OFFLINE</div>
       </div>
       
       <div class="header-center">
@@ -40,11 +40,11 @@
         <div class="status-indicator-group">
           <div id="conn-pill" class="status-pill status-disconnected">
             <span class="pill-dot"></span>
-            <span id="conn-label">NOT CONNECTED</span>
+            <span id="conn-label">ESP32: DISCONNECTED</span>
           </div>
-          <div id="armed-pill" class="status-pill status-disarmed">
-            <span class="pill-icon">⬡</span>
-            <span id="armed-label">DISCONNECTED</span>
+          <div id="cam-pill-header" class="status-pill status-disarmed">
+            <span class="pill-icon">📹</span>
+            <span id="cam-header-label">CAM: 192.168.4.1</span>
           </div>
           <div id="gps-pill" class="status-pill status-disarmed">
             <span class="pill-icon">🛰</span>
@@ -58,10 +58,10 @@
       </div>
 
       <div class="header-right">
-        <button id="btn-audio-mute" class="hud-btn" title="Toggle Buzzer Alarm" aria-label="Toggle Buzzer">
+        <button id="btn-audio-mute" class="hud-btn" title="Toggle Browser Audio Alerts" aria-label="Toggle Browser Audio Alerts">
           <span id="mute-icon">🔔</span>
         </button>
-        <button id="btn-sim-toggle" class="hud-btn hud-btn-sim" title="Toggle Live Gateway / Simulation Demo Mode">
+        <button id="btn-sim-toggle" class="hud-btn hud-btn-sim" title="Toggle Hardware Link / Demo Simulation">
           <span id="sim-toggle-label">Demo: OFF</span>
         </button>
         <button id="btn-emergency-header" class="hud-btn hud-btn-estop" title="EMERGENCY MOTOR CUT" aria-label="Emergency Stop">
@@ -78,37 +78,33 @@
         <ul class="nav-menu">
           <li class="nav-item active" data-screen="dashboard">
             <span class="nav-icon">📊</span>
-            <span class="nav-text">Dashboard</span>
-          </li>
-          <li class="nav-item" data-screen="livecam">
-            <span class="nav-icon">📹</span>
-            <span class="nav-text">RGB Live Cam</span>
+            <span class="nav-text">Overview</span>
           </li>
           <li class="nav-item" data-screen="aistream">
-            <span class="nav-icon">🎯</span>
+            <span class="nav-icon">📹</span>
             <span class="nav-text">AI Cam Stream</span>
-            <span class="nav-badge" style="background: #22c55e; color: #000; font-size: 9px; padding: 2px 5px; border-radius: 4px; font-weight: bold;">LIVE AI</span>
+            <span class="nav-badge" style="background: #22c55e; color: #000; font-size: 9px; padding: 2px 5px; border-radius: 4px; font-weight: bold;">LIVE</span>
           </li>
           <li class="nav-item" data-screen="thermal">
             <span class="nav-icon">🔥</span>
-            <span class="nav-text">Thermal Cam</span>
+            <span class="nav-text">Thermal Camera</span>
+          </li>
+          <li class="nav-item" data-screen="diagnostics">
+            <span class="nav-icon">🩺</span>
+            <span class="nav-text">Sensor Monitoring</span>
           </li>
           <li class="nav-item" data-screen="map">
-            <span class="nav-icon">🗺️</span>
-            <span class="nav-text">Fire Map</span>
+            <span class="nav-icon">🛰️</span>
+            <span class="nav-text">GPS Tracking</span>
           </li>
           <li class="nav-item" data-screen="alerts">
             <span class="nav-icon">🚨</span>
-            <span class="nav-text">Fire Alerts</span>
+            <span class="nav-text">Alert Center</span>
             <span id="alert-counter-badge" class="nav-badge hidden">0</span>
           </li>
           <li class="nav-item" data-screen="flight">
             <span class="nav-icon">🕹️</span>
             <span class="nav-text">Flight Controls</span>
-          </li>
-          <li class="nav-item" data-screen="diagnostics">
-            <span class="nav-icon">🩺</span>
-            <span class="nav-text">Diagnostics</span>
           </li>
           <li class="nav-item" data-screen="connection">
             <span class="nav-icon">📶</span>
@@ -120,7 +116,7 @@
           </li>
           <li class="nav-item" data-screen="about">
             <span class="nav-icon">ℹ️</span>
-            <span class="nav-text">About & Install</span>
+            <span class="nav-text">About &amp; Install</span>
           </li>
         </ul>
 
@@ -129,7 +125,7 @@
             <span class="pulse-indicator"></span>
             <span id="latency-text">LINK: SCANNING...</span>
           </div>
-          <div class="firmware-tag">FW: ESP32-DEV-1.1</div>
+          <div class="firmware-tag">FW: ESP32-DEVKIT-V1</div>
         </div>
       </nav>
 
@@ -419,271 +415,20 @@
         </section>
 
         <!-- ======================================================= -->
-        <!-- SCREEN 2: DRONE VISION & AI OBJECT DETECTION SUITE -->
-        <!-- ======================================================= -->
-        <section id="screen-livecam" class="screen-view">
-          <div class="view-header">
-            <div>
-              <h2>Drone Vision & AI Object Detection</h2>
-              <p class="section-desc">Wireless AI-Thinker ESP32-CAM stream & multi-class YOLO aerial detection (Person, Wildlife, Fire, Smoke).</p>
-            </div>
-            <div class="view-actions">
-              <button id="btn-toggle-camera" class="btn-toggle" style="background: #2563eb; color: #fff; font-weight: 700;">▶ Start Live Camera</button>
-              <button id="btn-toggle-annotated" class="btn-toggle active">Overlay: ANNOTATED HUD</button>
-              <button id="btn-camera-fullscreen" class="btn-secondary">⛶ Fullscreen</button>
-              <button id="btn-cam-snapshot" class="btn-secondary">📸 Snapshot</button>
-            </div>
-          </div>
-
-          <!-- Monitoring Statistics Cards Bar -->
-          <div class="metric-grid" style="grid-template-columns: repeat(6, 1fr); margin-bottom: 16px;">
-            <div class="metric-card">
-              <div class="metric-header">
-                <span class="metric-label">TOTAL DETECTIONS</span>
-                <span class="metric-pin">ALL CLASSES</span>
-              </div>
-              <div class="metric-value" id="stat-total-detections">0</div>
-              <div class="metric-sub" id="stat-total-sub">Patrol scanning</div>
-            </div>
-
-            <div class="metric-card">
-              <div class="metric-header">
-                <span class="metric-label">PEOPLE DETECTED</span>
-                <span class="metric-pin">CLASS 0</span>
-              </div>
-              <div class="metric-value" style="color: #22c55e;" id="stat-people-detected">0</div>
-              <div class="metric-sub" id="stat-people-sub">Ground personnel</div>
-            </div>
-
-            <div class="metric-card">
-              <div class="metric-header">
-                <span class="metric-label">ANIMALS / WILDLIFE</span>
-                <span class="metric-pin">10 SPECIES</span>
-              </div>
-              <div class="metric-value" style="color: #00d4ff;" id="stat-animals-detected">0</div>
-              <div class="metric-sub" id="stat-animals-sub">Bird, Dog, Cat, Cow, etc.</div>
-            </div>
-
-            <div class="metric-card" id="card-fire-stat">
-              <div class="metric-header">
-                <span class="metric-label">FIRE DETECTIONS</span>
-                <span class="metric-pin" style="color: #ef4444;">HAZARD</span>
-              </div>
-              <div class="metric-value" style="color: #ef4444;" id="stat-fire-detected">0</div>
-              <div class="metric-sub" id="stat-fire-sub">Active canopy flame</div>
-            </div>
-
-            <div class="metric-card" id="card-smoke-stat">
-              <div class="metric-header">
-                <span class="metric-label">SMOKE PLUMES</span>
-                <span class="metric-pin" style="color: #f59e0b;">HAZARD</span>
-              </div>
-              <div class="metric-value" style="color: #f59e0b;" id="stat-smoke-detected">0</div>
-              <div class="metric-sub" id="stat-smoke-sub">Smoldering / early plume</div>
-            </div>
-
-            <div class="metric-card">
-              <div class="metric-header">
-                <span class="metric-label">CAMERA UPTIME</span>
-                <span class="metric-pin">LINK</span>
-              </div>
-              <div class="metric-value" style="font-size: 18px;" id="stat-camera-uptime">00:00:00</div>
-              <div class="metric-sub" id="cam-status-text">Disconnected</div>
-            </div>
-          </div>
-
-          <!-- Video Canvas / Stream Container -->
-          <div class="camera-canvas-container" id="camera-viewport-container" style="background: #000; min-height: 520px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative;">
-            <img id="drone-live-stream-img" src="" style="width: 100%; height: 100%; max-height: 540px; object-fit: contain; border-radius: 8px; display: none;" alt="Live Drone Vision Feed">
-            <video id="webcam-video" autoplay playsinline muted style="display:none;"></video>
-            <canvas id="canvas-rgb" width="960" height="540"></canvas>
-
-            <!-- Offline / Connecting Standby Box -->
-            <div id="cam-offline-box" style="display: none; flex-direction: column; align-items: center; justify-content: center; padding: 40px; text-align: center;">
-              <span style="font-size: 40px; margin-bottom: 12px;">📡</span>
-              <h3 style="color: #00d4ff; margin-bottom: 8px; font-size: 18px;">Drone Vision Feed Standby</h3>
-              <p style="color: #8a96aa; max-width: 520px; font-size: 13px; line-height: 1.5; margin-bottom: 16px;">
-                Connecting to AI Inference Service at <code style="color: #22c55e;" id="backend-addr-label">http://localhost:8000</code>.
-                Make sure the backend is running or switch to Simulated Patrol.
-              </p>
-              <div style="display: flex; gap: 12px;">
-                <button id="btn-reconnect-vision" class="btn-primary" style="padding: 10px 20px; font-weight: 600;">
-                  🔄 Reconnect Stream
-                </button>
-                <button id="btn-quick-switch-sim" class="btn-secondary" style="padding: 10px 20px;">
-                  🌲 Start Flight Simulation
-                </button>
-              </div>
-            </div>
-
-            <!-- Overlaid Tactical HUD -->
-            <div class="camera-hud-overlay" style="pointer-events: none;">
-              <div class="hud-top-left">
-                <span class="rec-dot" id="hud-rec-dot"></span>
-                <span id="cam-connection-badge" style="background: #ef4444; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold; margin-right: 6px;">OFFLINE</span>
-                <span id="hud-source-label">SOURCE: STANDBY</span>
-                <span class="fps-tag" id="cam-fps-badge">0.0 FPS</span>
-              </div>
-              <div class="hud-top-right">
-                <span id="cam-res-badge" style="background: rgba(0,0,0,0.6); padding: 3px 8px; border-radius: 4px; margin-right: 8px; font-family: monospace;">--x--</span>
-                <span id="cam-frame-age" style="background: rgba(0,0,0,0.6); padding: 3px 8px; border-radius: 4px; font-family: monospace;">AGE: --ms</span>
-              </div>
-              <div class="hud-center-crosshair">
-                <div class="cross-line cross-h"></div>
-                <div class="cross-line cross-v"></div>
-                <div class="cross-box"></div>
-              </div>
-              <div class="hud-bottom-bar">
-                <div id="ai-detection-tag" class="detection-pill">AI INFERENCE: PATROL (STANDBY)</div>
-                <div class="hud-drone-stats">
-                  <span id="ai-targets-summary" style="margin-right: 8px; font-weight: bold;">TARGETS: 0</span>
-                  <span id="ai-persistence-tag">VERIFYING: [0/6]</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Camera Stream Controls Bar -->
-          <div class="camera-controls-bar" style="margin-top: 14px; flex-wrap: wrap; gap: 16px;">
-            <div class="control-item">
-              <label>Camera Source:</label>
-              <select id="select-cam-source" class="tactical-select">
-                <option value="simulation" selected>🌲 Simulated Tactical Forest Drone Patrol</option>
-                <option value="esp32_cam">📡 AI-Thinker ESP32-CAM (Wi-Fi MJPEG)</option>
-                <option value="webcam">💻 Local Laptop Camera / USB Capture</option>
-              </select>
-            </div>
-            <div class="control-item" id="esp32-url-group" style="display: none;">
-              <label>ESP32-CAM Stream URL:</label>
-              <input type="text" id="input-esp32-url" class="tactical-select" style="min-width: 240px; font-family: monospace; font-size: 12px;" value="http://192.168.4.2/stream">
-              <button id="btn-apply-esp32-url" class="btn-primary" style="padding: 6px 12px; font-size: 12px;">Connect</button>
-            </div>
-            <div class="control-item">
-              <label>Backend URL:</label>
-              <input type="text" id="input-backend-url" class="tactical-select" style="width: 170px; font-family: monospace; font-size: 12px;" value="http://localhost:8000">
-            </div>
-            <div class="control-item">
-              <label>Payload Spray:</label>
-              <button id="btn-water-spray" class="btn-secondary" style="padding: 6px 14px; font-weight: 700; color: #ef4444; border-color: #ef4444;" disabled>Water Spray (DISARMED)</button>
-            </div>
-          </div>
-
-          <!-- AI Detection Status & Thresholds Panel -->
-          <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-top: 16px;">
-            <!-- Category Status Cards -->
-            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
-              <div class="metric-card" id="status-card-person" style="border-left: 3px solid #22c55e;">
-                <div class="metric-header">
-                  <span class="metric-label">👤 PERSON STATUS</span>
-                </div>
-                <div class="metric-value" style="font-size: 18px; color: #22c55e;" id="val-status-person">CLEAR</div>
-                <div class="metric-sub" id="sub-status-person">Count: 0</div>
-              </div>
-
-              <div class="metric-card" id="status-card-animal" style="border-left: 3px solid #00d4ff;">
-                <div class="metric-header">
-                  <span class="metric-label">🐾 WILDLIFE / ANIMAL</span>
-                </div>
-                <div class="metric-value" style="font-size: 18px; color: #00d4ff;" id="val-status-animal">CLEAR</div>
-                <div class="metric-sub" id="sub-status-animal">Species: None</div>
-              </div>
-
-              <div class="metric-card" id="status-card-fire" style="border-left: 3px solid #ef4444;">
-                <div class="metric-header">
-                  <span class="metric-label">🔥 FIRE HAZARD</span>
-                </div>
-                <div class="metric-value" style="font-size: 18px; color: #ef4444;" id="val-status-fire">CLEAR</div>
-                <div class="metric-sub" id="sub-status-fire">Thermal lock: None</div>
-              </div>
-
-              <div class="metric-card" id="status-card-smoke" style="border-left: 3px solid #f59e0b;">
-                <div class="metric-header">
-                  <span class="metric-label">💨 SMOKE HAZARD</span>
-                </div>
-                <div class="metric-value" style="font-size: 18px; color: #f59e0b;" id="val-status-smoke">CLEAR</div>
-                <div class="metric-sub" id="sub-status-smoke">Plume index: Normal</div>
-              </div>
-            </div>
-
-            <!-- Per-Class Confidence Threshold Controls -->
-            <div class="metric-card" style="padding: 14px 18px;">
-              <div class="metric-header" style="margin-bottom: 8px;">
-                <span class="metric-label">CONFIDENCE THRESHOLDS</span>
-                <button id="btn-save-thresholds" class="btn-text-action" style="font-size: 11px;">Update</button>
-              </div>
-              <div style="display: flex; flex-direction: column; gap: 8px; font-size: 11px;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                  <span>🔥 Fire Conf:</span>
-                  <input type="range" id="thresh-fire" min="15" max="90" value="30" style="width: 110px;">
-                  <span id="val-thresh-fire" style="font-family: monospace; width: 32px; text-align: right;">30%</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                  <span>💨 Smoke Conf:</span>
-                  <input type="range" id="thresh-smoke" min="15" max="90" value="30" style="width: 110px;">
-                  <span id="val-thresh-smoke" style="font-family: monospace; width: 32px; text-align: right;">30%</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                  <span>👤 Person Conf:</span>
-                  <input type="range" id="thresh-person" min="20" max="90" value="45" style="width: 110px;">
-                  <span id="val-thresh-person" style="font-family: monospace; width: 32px; text-align: right;">45%</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                  <span>🐾 Animal Conf:</span>
-                  <input type="range" id="thresh-animal" min="20" max="90" value="40" style="width: 110px;">
-                  <span id="val-thresh-animal" style="font-family: monospace; width: 32px; text-align: right;">40%</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Detection Event History & Alerts Table -->
-          <div class="panel-box" style="margin-top: 16px;">
-            <div class="panel-box-header" style="display: flex; justify-content: space-between; align-items: center;">
-              <div>
-                <h3>LIVE DETECTION EVENT HISTORY & ALERTS</h3>
-                <p style="color: #8a96aa; font-size: 12px; margin-top: 2px;">Chronological verified detections with cooldown protection.</p>
-              </div>
-              <div style="display: flex; gap: 10px;">
-                <button id="btn-test-alert" class="btn-secondary" style="padding: 6px 12px; font-size: 11px;">🔔 Test Alert Buzzer</button>
-                <button id="btn-clear-alerts" class="btn-secondary" style="padding: 6px 12px; font-size: 11px;">🧹 Clear Alerts</button>
-              </div>
-            </div>
-            <div class="table-container" style="max-height: 260px; overflow-y: auto;">
-              <table class="tactical-table">
-                <thead>
-                  <tr>
-                    <th># ID</th>
-                    <th>TIMESTAMP</th>
-                    <th>TARGET CLASS</th>
-                    <th>CATEGORY</th>
-                    <th>CONFIDENCE</th>
-                    <th>SEVERITY</th>
-                    <th>STATUS</th>
-                  </tr>
-                </thead>
-                <tbody id="detection-history-tbody">
-                  <tr>
-                    <td colspan="7" style="text-align: center; color: #8a96aa; padding: 24px;">
-                      No detection events recorded yet. Video stream active.
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
-        <!-- ======================================================= -->
-        <!-- SCREEN 2B: LIVE AI CAM STREAM & YOLO DETECTION HUB -->
+        <!-- SCREEN 2: AI CAM STREAM — ACTUAL ESP32-CAM VIDEO & YOLO -->
         <!-- ======================================================= -->
         <section id="screen-aistream" class="screen-view">
           <div class="view-header">
             <div>
-              <h2>Live AI Cam Stream & YOLO Detection Hub</h2>
-              <p class="section-desc">Real-time multi-class drone vision feed (Person, Wildlife, Fire, Smoke) with bounding boxes and hazard alerts.</p>
+              <div class="cockpit-title-row" style="display: flex; align-items: center; gap: 10px;">
+                <h2>AI Cam Stream — Actual ESP32-CAM Video</h2>
+                <span class="pro-tag" style="background: rgba(34, 197, 94, 0.2); color: #22c55e; border: 1px solid #22c55e; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">TY-OV3660 ACTIVE</span>
+              </div>
+              <p class="section-desc">Wireless live video stream directly from AI-Thinker ESP32-CAM (SoftAP SSID: <code>FIRE-GUARDIAN-CAM</code>, IP: <code>http://192.168.4.1/stream</code>) with real-time YOLO object detection.</p>
             </div>
             <div class="view-actions">
-              <button id="btn-toggle-camera-ai" class="btn-toggle" style="background: #2563eb; color: #fff; font-weight: 700;">▶ Start Live Camera</button>
+              <button id="btn-toggle-camera-ai" class="btn-toggle" style="background: #2563eb; color: #fff; font-weight: 700;">▶ START STREAM</button>
+              <button id="btn-reconnect-stream-ai" class="btn-secondary" title="Force Stream Reconnect">🔄 Reconnect</button>
               <button id="btn-toggle-annotated-ai" class="btn-toggle active">Overlay: ANNOTATED HUD</button>
               <button id="btn-camera-fullscreen-ai" class="btn-secondary">⛶ Fullscreen</button>
               <button id="btn-cam-snapshot-ai" class="btn-secondary">📸 Snapshot</button>
@@ -701,7 +446,7 @@
                 <span class="metric-pin">ALL CLASSES</span>
               </div>
               <div class="metric-value" id="stat-total-detections-ai">0</div>
-              <div class="metric-sub">Patrol scanning</div>
+              <div class="metric-sub" id="stat-total-sub-ai">Patrol scanning</div>
             </div>
 
             <div class="metric-card">
@@ -710,16 +455,16 @@
                 <span class="metric-pin">CLASS 0</span>
               </div>
               <div class="metric-value" style="color: #22c55e;" id="stat-people-detected-ai">0</div>
-              <div class="metric-sub">Ground personnel</div>
+              <div class="metric-sub" id="stat-people-sub-ai">Ground personnel</div>
             </div>
 
             <div class="metric-card">
               <div class="metric-header">
-                <span class="metric-label">ANIMALS / WILDLIFE</span>
-                <span class="metric-pin">SPECIES</span>
+                <span class="metric-label">WILDLIFE SPECIES</span>
+                <span class="metric-pin">MULTI-SPECIES</span>
               </div>
               <div class="metric-value" style="color: #00d4ff;" id="stat-animals-detected-ai">0</div>
-              <div class="metric-sub">Bird, Dog, Cat, Cow, etc.</div>
+              <div class="metric-sub" id="stat-animals-sub-ai">Elephant, Bear, Deer, etc.</div>
             </div>
 
             <div class="metric-card" id="card-fire-stat-ai">
@@ -728,7 +473,7 @@
                 <span class="metric-pin" style="color: #ef4444;">HAZARD</span>
               </div>
               <div class="metric-value" style="color: #ef4444;" id="stat-fire-detected-ai">0</div>
-              <div class="metric-sub">Active flame</div>
+              <div class="metric-sub" id="stat-fire-sub-ai">Active flame</div>
             </div>
 
             <div class="metric-card" id="card-smoke-stat-ai">
@@ -737,7 +482,7 @@
                 <span class="metric-pin" style="color: #f59e0b;">HAZARD</span>
               </div>
               <div class="metric-value" style="color: #f59e0b;" id="stat-smoke-detected-ai">0</div>
-              <div class="metric-sub">Smoldering / early plume</div>
+              <div class="metric-sub" id="stat-smoke-sub-ai">Smoldering plume</div>
             </div>
 
             <div class="metric-card">
@@ -752,21 +497,31 @@
 
           <!-- Live Video Viewport Container -->
           <div class="camera-canvas-container" id="camera-viewport-container-ai" style="background: #000; min-height: 520px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-subtle);">
-            <img id="drone-live-stream-img-ai" src="http://localhost:8000/api/camera/stream?annotated=true" style="width: 100%; height: 100%; max-height: 540px; object-fit: contain; border-radius: 8px; display: block;" alt="Live Drone Vision Feed" onerror="this.style.display='none'; document.getElementById('cam-fallback-box-ai').style.display='flex';">
+            <img id="drone-live-stream-img-ai" src="http://192.168.4.1/stream" style="width: 100%; height: 100%; max-height: 540px; object-fit: contain; border-radius: 8px; display: block;" alt="Live ESP32-CAM Feed" onerror="this.style.display='none'; document.getElementById('cam-fallback-box-ai').style.display='flex';">
             
-            <!-- Fallback Standby Box if backend server is not running yet -->
+            <!-- Fallback Standby Box if camera or backend is not reachable -->
             <div id="cam-fallback-box-ai" style="display: none; flex-direction: column; align-items: center; justify-content: center; padding: 40px; text-align: center;">
-              <span style="font-size: 40px; margin-bottom: 12px;">📡</span>
-              <h3 style="color: #00d4ff; margin-bottom: 8px; font-size: 18px;">AI Drone Vision Server Standby</h3>
-              <p style="color: #8a96aa; max-width: 520px; font-size: 13px; line-height: 1.5; margin-bottom: 16px;">
-                To view the live YOLO stream here, run the launcher command in your terminal on your laptop:
+              <span style="font-size: 42px; margin-bottom: 12px;">📡</span>
+              <h3 style="color: #00d4ff; margin-bottom: 8px; font-size: 18px;">ESP32-CAM Live Video Stream Standby</h3>
+              <p style="color: #cbd5e1; max-width: 580px; font-size: 13px; line-height: 1.6; margin-bottom: 16px;">
+                The video stream comes directly from the AI-Thinker ESP32-CAM with TY-OV3660 camera.
+                Connect your laptop or mobile device Wi-Fi to:
               </p>
-              <div style="background: #111722; padding: 12px 20px; border-radius: 8px; border: 1px solid #273549; margin-bottom: 18px; font-family: monospace; color: #22c55e; font-size: 14px; user-select: all; font-weight: bold;">
-                python3 run_drone_vision.py
+              <div style="background: #0b1322; padding: 12px 24px; border-radius: 8px; border: 1px solid #1e293b; margin-bottom: 16px; font-family: monospace; font-size: 13px; color: #38bdf8;">
+                Wi-Fi SSID: <strong>FIRE-GUARDIAN-CAM</strong> &nbsp;|&nbsp; Stream: <strong>http://192.168.4.1/stream</strong>
+              </div>
+              <p style="color: #8a96aa; max-width: 540px; font-size: 12px; line-height: 1.5; margin-bottom: 18px;">
+                If running the local YOLO AI vision inference service on this laptop, launch:
+              </p>
+              <div style="background: #111722; padding: 10px 20px; border-radius: 8px; border: 1px solid #273549; margin-bottom: 18px; font-family: monospace; color: #22c55e; font-size: 13px; user-select: all; font-weight: bold;">
+                python3 -m ai_pipeline.service.main
               </div>
               <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;">
-                <button id="btn-retry-stream-8000" class="btn-primary" style="padding: 10px 20px; font-weight: 600;">
-                  🔄 Retry Connection (:8000)
+                <button id="btn-retry-stream-direct" class="btn-primary" style="padding: 10px 20px; font-weight: 600;">
+                  🔄 Retry Direct ESP32-CAM (192.168.4.1)
+                </button>
+                <button id="btn-retry-stream-8000" class="btn-secondary" style="padding: 10px 20px;">
+                  ⚡ Connect via AI Backend (:8000)
                 </button>
                 <button id="btn-retry-stream-5050" class="btn-secondary" style="padding: 10px 20px;">
                   🚀 Try Port 5050 Feed
@@ -778,13 +533,13 @@
             <div class="camera-hud-overlay" style="pointer-events: none;">
               <div class="hud-top-left">
                 <span class="rec-dot" id="hud-rec-dot-ai"></span>
-                <span id="cam-connection-badge-ai" style="background: #22c55e; color: #000; padding: 2px 6px; border-radius: 4px; font-weight: bold; margin-right: 6px; font-size: 10px;">LIVE FEED</span>
-                <span id="hud-source-label-ai">YOLOv8 MULTI-CLASS</span>
+                <span id="cam-connection-badge-ai" style="background: #22c55e; color: #000; padding: 2px 6px; border-radius: 4px; font-weight: bold; margin-right: 6px; font-size: 10px;">LIVE STREAM</span>
+                <span id="hud-source-label-ai">ESP32-CAM (TY-OV3660)</span>
                 <span class="fps-tag" id="cam-fps-badge-ai">30.0 FPS</span>
               </div>
               <div class="hud-top-right">
                 <span id="cam-res-badge-ai" style="background: rgba(0,0,0,0.6); padding: 3px 8px; border-radius: 4px; margin-right: 8px; font-family: monospace; font-size: 11px;">640x480 VGA</span>
-                <span id="cam-frame-age-ai" style="background: rgba(0,0,0,0.6); padding: 3px 8px; border-radius: 4px; font-family: monospace; font-size: 11px;">AGE: 12ms</span>
+                <span id="cam-frame-age-ai" style="background: rgba(0,0,0,0.6); padding: 3px 8px; border-radius: 4px; font-family: monospace; font-size: 11px;">AGE: 10ms</span>
               </div>
               <div class="hud-center-crosshair">
                 <div class="cross-line cross-h"></div>
@@ -804,20 +559,20 @@
           <!-- Camera Stream Controls Bar -->
           <div class="camera-controls-bar" style="margin-top: 14px; flex-wrap: wrap; gap: 16px;">
             <div class="control-item">
-              <label>Camera Source:</label>
+              <label>Stream Source:</label>
               <select id="select-cam-source-ai" class="tactical-select">
-                <option value="simulation" selected>🌲 Simulated Drone Patrol (Offline Ready)</option>
-                <option value="esp32_cam">📡 AI-Thinker ESP32-CAM (Wi-Fi MJPEG)</option>
-                <option value="webcam">💻 Local Laptop Camera / USB Capture</option>
+                <option value="esp32_cam" selected>📡 Direct AI-Thinker ESP32-CAM (http://192.168.4.1/stream)</option>
+                <option value="fastapi_proxy">⚡ AI Vision Backend Proxy (http://localhost:8000)</option>
+                <option value="flask_gcs">🐍 Flask GCS Feed (http://localhost:5050)</option>
               </select>
             </div>
-            <div class="control-item" id="esp32-url-group-ai" style="display: none;">
-              <label>ESP32-CAM Stream URL:</label>
-              <input type="text" id="input-esp32-url-ai" class="tactical-select" style="min-width: 240px; font-family: monospace; font-size: 12px;" value="http://192.168.4.2/stream">
-              <button id="btn-apply-esp32-url-ai" class="btn-primary" style="padding: 6px 12px; font-size: 12px;">Connect</button>
+            <div class="control-item" id="esp32-url-group-ai" style="display: flex;">
+              <label>Camera Stream Endpoint:</label>
+              <input type="text" id="input-esp32-url-ai" class="tactical-select" style="min-width: 240px; font-family: monospace; font-size: 12px;" value="http://192.168.4.1/stream">
+              <button id="btn-apply-esp32-url-ai" class="btn-primary" style="padding: 6px 12px; font-size: 12px;">Apply URL</button>
             </div>
             <div class="control-item">
-              <label>Backend URL:</label>
+              <label>AI Backend URL:</label>
               <input type="text" id="input-backend-url-ai" class="tactical-select" style="width: 170px; font-family: monospace; font-size: 12px;" value="http://localhost:8000">
             </div>
             <div class="control-item">
@@ -839,7 +594,7 @@
 
               <div class="metric-card" id="status-card-animal-ai" style="border-left: 3px solid #00d4ff;">
                 <div class="metric-header">
-                  <span class="metric-label">🐾 WILDLIFE / ANIMAL</span>
+                  <span class="metric-label">🐾 WILDLIFE / SPECIES</span>
                 </div>
                 <div class="metric-value" style="font-size: 18px; color: #00d4ff;" id="val-status-animal-ai">CLEAR</div>
                 <div class="metric-sub" id="sub-status-animal-ai">Species: None</div>
@@ -931,72 +686,314 @@
         </section>
 
         <!-- ======================================================= -->
-        <!-- SCREEN 3: THERMAL CAMERA -->
+        <!-- SCREEN 3: THERMAL CAMERA — PSEUDO-THERMAL & WILDLIFE DANGER -->
         <!-- ======================================================= -->
         <section id="screen-thermal" class="screen-view">
           <div class="view-header">
             <div>
-              <h2>Thermal Radiometric Imaging</h2>
-              <p class="section-desc">Long-Wave Infrared (LWIR) false-color thermal heatmap with spot temperature pyrometry.</p>
+              <div class="cockpit-title-row" style="display: flex; align-items: center; gap: 10px;">
+                <h2>Thermal Camera — Pseudo-Thermal AI Visualization</h2>
+                <span class="pro-tag" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid #f59e0b; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">LUMINANCE HEATMAP</span>
+              </div>
+              <p class="section-desc">Real-time false-color thermal gradient derived from live ESP32-CAM RGB video with species detection and wildlife danger assessment.</p>
             </div>
             <div class="view-actions">
-              <label class="palette-label">Palette:</label>
+              <label class="palette-label" style="font-size: 12px; color: #8a96aa;">Palette:</label>
               <select id="select-thermal-palette" class="tactical-select">
-                <option value="ironbow">Ironbow (Ember / Blue)</option>
-                <option value="inferno">Inferno</option>
-                <option value="rainbow">Rainbow / Jet</option>
+                <option value="ironbow" selected>Ironbow (Ember / Blue / White)</option>
+                <option value="inferno">Inferno (Black / Purple / Yellow)</option>
+                <option value="rainbow">Rainbow / Jet (Blue / Green / Red)</option>
                 <option value="whitehot">White Hot (Monochrome)</option>
               </select>
+              <div class="view-toggle-btns" style="display: flex; gap: 6px;">
+                <button id="btn-thermal-view-dual" class="btn-toggle active" style="font-size: 11px; padding: 6px 10px;">Split Side-by-Side</button>
+                <button id="btn-thermal-view-pseudo" class="btn-toggle" style="font-size: 11px; padding: 6px 10px;">Thermal Only</button>
+                <button id="btn-thermal-view-rgb" class="btn-toggle" style="font-size: 11px; padding: 6px 10px;">RGB Only</button>
+              </div>
             </div>
           </div>
 
-          <div class="camera-canvas-container">
-            <canvas id="canvas-thermal" width="960" height="540"></canvas>
-            
-            <div class="thermal-hud-overlay">
-              <div class="thermal-spot-readouts">
-                <div class="spot-card spot-max">
-                  <span class="spot-title">MAX TEMP</span>
-                  <span class="spot-val" id="thermal-max-temp">348.6 °C</span>
+          <!-- HARDWARE LIMITATION NOTICE (MANDATORY REQUIREMENT) -->
+          <div class="thermal-limitation-notice" style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(15, 23, 42, 0.95) 100%); border: 1px solid rgba(245, 158, 11, 0.4); border-left: 4px solid #f59e0b; border-radius: 8px; padding: 14px 18px; margin-bottom: 16px;">
+            <div style="display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+              <div style="flex: 1; min-width: 280px;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                  <span style="background: #f59e0b; color: #000; font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 4px; letter-spacing: 0.5px;">HARDWARE LIMITATION NOTICE</span>
+                  <strong style="color: #fbbf24; font-size: 14px;">PSEUDO-THERMAL / RGB-DERIVED VISUALIZATION</strong>
                 </div>
-                <div class="spot-card spot-center">
-                  <span class="spot-title">CENTER SPOT</span>
-                  <span class="spot-val" id="thermal-center-temp">42.1 °C</span>
-                </div>
-                <div class="spot-card spot-min">
-                  <span class="spot-title">MIN TEMP</span>
-                  <span class="spot-val" id="thermal-min-temp">18.2 °C</span>
-                </div>
+                <p style="color: #cbd5e1; font-size: 12px; line-height: 1.5; margin: 0;">
+                  This heat visualization is mathematically synthesized from the live AI-Thinker ESP32-CAM RGB video frames by calculating optical pixel luminance and mapping visual energy gradients onto thermal palettes. 
+                  <strong>This view represents optical intensity and scene contrast, NOT calibrated radiometric Celsius temperatures.</strong>
+                </p>
               </div>
+              <div style="display: flex; flex-direction: column; align-items: flex-end; justify-content: center; background: rgba(0,0,0,0.4); padding: 8px 14px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.08);">
+                <span style="font-size: 10px; color: #94a3b8; font-family: monospace;">RADIOMETRIC SENSOR INTERFACE (MLX90640 / FLIR LEPTON)</span>
+                <span id="thermal-hw-status" style="color: #ef4444; font-size: 12px; font-weight: bold; font-family: monospace; display: flex; align-items: center; gap: 6px; margin-top: 3px;">
+                  <span style="width: 7px; height: 7px; background: #ef4444; border-radius: 50%; display: inline-block;"></span>
+                  TEMPERATURE: SENSOR UNAVAILABLE
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dual Video & Thermal Display Container -->
+          <div id="thermal-display-container" style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
+            <!-- Left Viewport: Live Camera RGB Stream -->
+            <div id="thermal-rgb-viewport" class="camera-canvas-container" style="background: #000; min-height: 380px; position: relative; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: center;">
+              <img id="thermal-rgb-img" src="http://192.168.4.1/stream" style="width: 100%; height: 100%; object-fit: contain;" alt="Live RGB Camera Feed" onerror="this.src=''; this.style.display='none'; document.getElementById('thermal-rgb-fallback').style.display='flex';">
+              <div id="thermal-rgb-fallback" style="display: none; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center;">
+                <span style="font-size: 32px; margin-bottom: 8px;">📷</span>
+                <span style="color: #94a3b8; font-size: 13px;">ESP32-CAM RGB Video Standby</span>
+                <span style="color: #64748b; font-size: 11px; margin-top: 4px;">Connect Wi-Fi to FIRE-GUARDIAN-CAM</span>
+              </div>
+              <div style="position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; color: #22c55e;">
+                SOURCE: LIVE RGB CAM
+              </div>
+            </div>
+
+            <!-- Right Viewport: Real-time Pseudo-Thermal Heatmap Canvas -->
+            <div id="thermal-pseudo-viewport" class="camera-canvas-container" style="background: #000; min-height: 380px; position: relative; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: center;">
+              <canvas id="canvas-thermal-pseudo" width="640" height="480" style="width: 100%; height: 100%; object-fit: contain;"></canvas>
               
-              <div class="thermal-legend-bar">
-                <div class="legend-scale" id="thermal-legend-gradient"></div>
-                <div class="legend-labels">
-                  <span>15°C</span>
-                  <span>100°C</span>
-                  <span>250°C</span>
-                  <span>400°C</span>
+              <!-- Thermal Legend Bar Overlay -->
+              <div class="thermal-legend-bar" style="position: absolute; bottom: 12px; right: 12px; width: 230px; background: rgba(0,0,0,0.8); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1);">
+                <div style="display: flex; justify-content: space-between; font-size: 9px; color: #94a3b8; margin-bottom: 4px; font-family: monospace;">
+                  <span>OPTICAL LUMINANCE</span>
+                  <span id="thermal-palette-name-tag">IRONBOW</span>
                 </div>
+                <div class="legend-scale" id="thermal-legend-gradient" style="height: 10px; border-radius: 3px; background: linear-gradient(90deg, #05051a 0%, #1e1b4b 20%, #4338ca 40%, #e11d48 65%, #f59e0b 85%, #ffffff 100%);"></div>
+                <div class="legend-labels" style="display: flex; justify-content: space-between; font-size: 9px; font-family: monospace; color: #94a3b8; margin-top: 4px;">
+                  <span>0% AMBIENT</span>
+                  <span>25%</span>
+                  <span>50%</span>
+                  <span>75%</span>
+                  <span>100% PEAK</span>
+                </div>
+              </div>
+
+              <div style="position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; color: #f59e0b;">
+                PSEUDO-THERMAL HEATMAP (LUMINANCE)
               </div>
             </div>
           </div>
 
-          <div class="camera-controls-bar">
+          <!-- Controls Strip for Hotspot Threshold & Sensitivity -->
+          <div class="camera-controls-bar" style="margin-bottom: 16px; flex-wrap: wrap; gap: 16px;">
             <div class="control-item">
-              <label>Hotspot Trigger Threshold:</label>
-              <input type="range" id="slider-temp-thresh" min="60" max="350" value="85">
-              <span id="val-temp-threshold">85°C</span>
+              <label>Luminance Hotspot Threshold:</label>
+              <input type="range" id="slider-temp-thresh" min="30" max="95" value="70">
+              <span id="val-temp-threshold" style="font-family: monospace; font-size: 13px; color: #f59e0b;">70% Peak</span>
             </div>
             <div class="control-item">
-              <span class="info-note">Hardware note: Native FLIR/MLX90640 requires I2C bridge; simulated in current release.</span>
+              <label>Heatmap Sensitivity:</label>
+              <input type="range" id="slider-thermal-gain" min="50" max="200" value="100">
+              <span id="val-thermal-gain" style="font-family: monospace; font-size: 13px;">1.0x Gain</span>
+            </div>
+            <div class="control-item" style="margin-left: auto;">
+              <span style="font-size: 11px; color: #8a96aa; font-family: monospace;">True Temperature Pyrometry: <strong style="color: #ef4444;">SENSOR UNAVAILABLE</strong></span>
+            </div>
+          </div>
+
+          <!-- AI Species Detection & Intelligent Wildlife Danger Assessment -->
+          <div class="panel-box" style="margin-bottom: 16px;">
+            <div class="panel-box-header" style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="font-size: 18px;">🐾</span>
+                  <h3 style="margin: 0;">AI SPECIES DETECTION &amp; WILDLIFE DANGER ASSESSMENT</h3>
+                </div>
+                <p style="color: #8a96aa; font-size: 12px; margin-top: 2px;">
+                  Real-time aerial wildlife intelligence detecting: Elephant, Deer, Tiger, Leopard, Bear, Wild Boar, Human, and other forest fauna.
+                </p>
+              </div>
+              <div id="ai-model-status-pill" style="background: rgba(34, 197, 94, 0.15); border: 1px solid #22c55e; color: #22c55e; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: bold; font-family: monospace;">
+                MODEL STATUS: READY
+              </div>
+            </div>
+
+            <!-- Active Wildlife Targets Table -->
+            <div class="table-container" style="overflow-x: auto;">
+              <table class="tactical-table">
+                <thead>
+                  <tr>
+                    <th>SPECIES</th>
+                    <th>CONFIDENCE</th>
+                    <th>THREAT CATEGORY</th>
+                    <th>THREAT REASON</th>
+                    <th>DETECTION TIME</th>
+                    <th>RECOMMENDED SAFETY ACTION</th>
+                    <th>DISTANCE</th>
+                  </tr>
+                </thead>
+                <tbody id="wildlife-threat-tbody">
+                  <tr>
+                    <td colspan="7" style="text-align: center; color: #8a96aa; padding: 24px;">
+                      Scanning forest canopy for wildlife species. No hazardous fauna in immediate FOV.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </section>
 
         <!-- ======================================================= -->
-        <!-- SCREEN 4: FIRE MAP -->
+        <!-- SCREEN 4: SENSOR MONITORING — REAL-TIME HARDWARE INTEGRATION -->
         <!-- ======================================================= -->
-        <section id="screen-map" class="screen-view">
+        <section id="screen-diagnostics" class="screen-view">
+          <div class="view-header">
+            <div>
+              <div class="cockpit-title-row" style="display: flex; align-items: center; gap: 10px;">
+                <h2>Sensor Monitoring — Real-Time Hardware Integration</h2>
+                <span class="pro-tag" style="background: rgba(0, 212, 255, 0.2); color: #00d4ff; border: 1px solid #00d4ff; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">ESP32 DEVKIT</span>
+              </div>
+              <p class="section-desc">Direct environmental telemetry from onboard ESP32 DevKit hardware (MQ-2 Smoke, Optical Flame Sensor, Hardware Buzzer, NEO-7M GPS, LCD 16x2).</p>
+            </div>
+            <div class="view-actions">
+              <span id="esp32-hw-conn-badge" style="background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; padding: 5px 12px; border-radius: 4px; font-size: 11px; font-weight: bold; font-family: monospace;">
+                ESP32: DISCONNECTED
+              </span>
+              <button id="btn-sync-sensors" class="btn-secondary" style="padding: 6px 12px; font-size: 12px;">🔄 Refresh Telemetry</button>
+            </div>
+          </div>
+
+          <!-- Hardware Telemetry Cards Grid -->
+          <div class="diagnostics-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px;">
+            
+            <!-- 1. MQ-2 SMOKE SENSOR (GPIO 34 AO) -->
+            <div class="diag-card" id="card-sensor-mq2" style="background: #0d131f; border: 1px solid var(--border-subtle); border-radius: 8px; padding: 16px;">
+              <div class="diag-card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <div>
+                  <h4 style="margin: 0; font-size: 15px; color: #fff;">MQ-2 Smoke &amp; Gas Sensor</h4>
+                  <span style="font-size: 11px; color: #8a96aa; font-family: monospace;">GPIO 34 (AO) &bull; 12-Bit ADC</span>
+                </div>
+                <span class="badge-sensor-status badge-ok" id="status-smoke-badge" style="background: #22c55e; color: #000; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">SAFE</span>
+              </div>
+              <div style="margin: 14px 0;">
+                <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                  <span style="font-size: 11px; color: #8a96aa;">RAW ANALOG READING:</span>
+                  <span id="val-mq2-raw-ao" style="font-size: 26px; font-family: monospace; font-weight: 800; color: #00d4ff;">-- <span style="font-size: 14px; color: #8a96aa;">/ 4095</span></span>
+                </div>
+                <div class="metric-bar-track" style="margin-top: 8px; height: 10px; background: #162032; border-radius: 5px; overflow: hidden;">
+                  <div class="metric-bar-fill" id="bar-mq2-fill" style="width: 0%; height: 100%; background: #22c55e; transition: width 0.3s ease;"></div>
+                </div>
+              </div>
+              
+              <!-- Configurable Smoke Threshold Controls -->
+              <div style="background: #111a2c; padding: 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06); margin-top: 12px;">
+                <span style="font-size: 10px; color: #8a96aa; font-weight: bold; letter-spacing: 0.5px; display: block; margin-bottom: 8px;">CONFIGURABLE SAFETY THRESHOLDS:</span>
+                <div style="display: flex; flex-direction: column; gap: 8px; font-size: 11px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="color: #fbbf24;">Warning Level:</span>
+                    <input type="range" id="slider-smoke-warn" min="400" max="2500" value="1200" style="width: 110px;">
+                    <span id="val-smoke-warn-thresh" style="font-family: monospace; width: 44px; text-align: right; color: #fbbf24;">1200</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="color: #ef4444;">Critical Level:</span>
+                    <input type="range" id="slider-smoke-crit" min="1500" max="3800" value="2400" style="width: 110px;">
+                    <span id="val-smoke-crit-thresh" style="font-family: monospace; width: 44px; text-align: right; color: #ef4444;">2400</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. FLAME SENSOR (GPIO 27 DO) -->
+            <div class="diag-card" id="card-sensor-flame" style="background: #0d131f; border: 1px solid var(--border-subtle); border-radius: 8px; padding: 16px;">
+              <div class="diag-card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <div>
+                  <h4 style="margin: 0; font-size: 15px; color: #fff;">Optical Flame Detector</h4>
+                  <span style="font-size: 11px; color: #8a96aa; font-family: monospace;">GPIO 27 (DO) &bull; Active-LOW</span>
+                </div>
+                <span class="badge-sensor-status badge-ok" id="status-flame-badge" style="background: #22c55e; color: #000; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">NOT DETECTED</span>
+              </div>
+              <div style="margin: 20px 0; text-align: center;">
+                <div id="flame-sensor-icon" style="font-size: 44px; margin-bottom: 8px; filter: grayscale(1); opacity: 0.5;">🔥</div>
+                <div id="flame-sensor-state-text" style="font-size: 18px; font-weight: bold; color: #22c55e;">CLEAR (NO FLAME)</div>
+                <div style="font-size: 11px; color: #8a96aa; margin-top: 4px;">Optical Band: 760nm - 1100nm IR spectrum</div>
+              </div>
+              <table class="diag-table" style="width: 100%; font-size: 11px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 8px;">
+                <tr><td style="color:#8a96aa;">Digital Pin Level:</td><td id="val-flame-pin-level" style="font-family:monospace; text-align:right;">HIGH (3.3V)</td></tr>
+                <tr><td style="color:#8a96aa;">Trigger Polarity:</td><td style="font-family:monospace; text-align:right; color:#00d4ff;">Active-LOW (0V = Flame)</td></tr>
+              </table>
+            </div>
+
+            <!-- 3. EMERGENCY ALARM BUZZER (GPIO 25) -->
+            <div class="diag-card" id="card-sensor-buzzer" style="background: #0d131f; border: 1px solid var(--border-subtle); border-radius: 8px; padding: 16px;">
+              <div class="diag-card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <div>
+                  <h4 style="margin: 0; font-size: 15px; color: #fff;">Emergency Alarm Buzzer</h4>
+                  <span style="font-size: 11px; color: #8a96aa; font-family: monospace;">GPIO 25 &bull; Hardware Output</span>
+                </div>
+                <span class="badge-sensor-status badge-ok" id="status-buzzer-badge" style="background: rgba(255,255,255,0.1); color: #8a96aa; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">OFF</span>
+              </div>
+              <div style="margin: 20px 0; text-align: center;">
+                <div id="buzzer-sensor-icon" style="font-size: 44px; margin-bottom: 8px;">🔇</div>
+                <div id="val-buzzer-state-text" style="font-size: 18px; font-weight: bold; color: #8a96aa;">BUZZER: OFF (SILENT)</div>
+                <div style="font-size: 11px; color: #8a96aa; margin-top: 4px;">Hardware Alarm Siren on ESP32</div>
+              </div>
+              <div style="display: flex; gap: 8px; margin-top: 14px;">
+                <button id="btn-trigger-hardware-buzzer" class="btn-secondary" style="flex: 1; padding: 8px; font-size: 11px; font-weight: bold;">🔔 Trigger Hardware Siren</button>
+              </div>
+            </div>
+
+            <!-- 4. NEO-7M GPS RECEIVER (GPIO 16 RX / GPIO 17 TX) -->
+            <div class="diag-card" id="card-sensor-gps" style="background: #0d131f; border: 1px solid var(--border-subtle); border-radius: 8px; padding: 16px;">
+              <div class="diag-card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <div>
+                  <h4 style="margin: 0; font-size: 15px; color: #fff;">NEO-7M GPS Receiver</h4>
+                  <span style="font-size: 11px; color: #8a96aa; font-family: monospace;">UART2 &bull; GPIO 16 (RX), GPIO 17 (TX)</span>
+                </div>
+                <span class="badge-sensor-status badge-ok" id="status-gps-diag-badge" style="background: rgba(239, 68, 68, 0.2); color: #ef4444; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">OFFLINE</span>
+              </div>
+              <table class="diag-table" style="width: 100%; font-size: 12px; line-height: 1.8;">
+                <tr><td style="color:#8a96aa;">Latitude:</td><td id="diag-gps-lat" style="font-family:monospace; text-align:right; font-weight:bold;">--</td></tr>
+                <tr><td style="color:#8a96aa;">Longitude:</td><td id="diag-gps-lon" style="font-family:monospace; text-align:right; font-weight:bold;">--</td></tr>
+                <tr><td style="color:#8a96aa;">Satellites:</td><td id="diag-gps-sat-count" style="font-family:monospace; text-align:right; color:#00d4ff;">-- Locked</td></tr>
+                <tr><td style="color:#8a96aa;">GPS Link Status:</td><td id="diag-gps-fix-type" style="font-family:monospace; text-align:right; color:#ef4444;">Awaiting Lock</td></tr>
+              </table>
+            </div>
+
+            <!-- 5. LOCAL MONITORING LCD (GPIO 21 SDA / GPIO 22 SCL) -->
+            <div class="diag-card" id="card-sensor-lcd" style="background: #0d131f; border: 1px solid var(--border-subtle); border-radius: 8px; padding: 16px;">
+              <div class="diag-card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <div>
+                  <h4 style="margin: 0; font-size: 15px; color: #fff;">Local LCD 16x2 Display</h4>
+                  <span style="font-size: 11px; color: #8a96aa; font-family: monospace;">I2C 0x27 &bull; GPIO 21 (SDA), GPIO 22 (SCL)</span>
+                </div>
+                <span class="badge-sensor-status badge-ok" id="status-lcd-badge" style="background: #22c55e; color: #000; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">I2C ACK</span>
+              </div>
+              
+              <!-- Emulated 16x2 LCD Matrix Screen -->
+              <div style="background: #14280f; border: 4px solid #0a1407; border-radius: 6px; padding: 10px 14px; font-family: 'Courier New', Courier, monospace; color: #82e04d; text-shadow: 0 0 4px rgba(130, 224, 77, 0.6); letter-spacing: 2px; margin: 10px 0;">
+                <div id="lcd-line-1" style="font-size: 14px; line-height: 1.4; white-space: pre;">FG: SENSORS OK  </div>
+                <div id="lcd-line-2" style="font-size: 14px; line-height: 1.4; white-space: pre;">SMK:SAFE FLM:NO </div>
+              </div>
+              <div style="font-size: 10px; color: #8a96aa; text-align: center; margin-top: 6px;">
+                Direct mirror of physical 16x2 I2C dot-matrix LCD panel
+              </div>
+            </div>
+
+            <!-- 6. ESP32 CONNECTION & SYSTEM HEALTH -->
+            <div class="diag-card" id="card-sensor-system" style="background: #0d131f; border: 1px solid var(--border-subtle); border-radius: 8px; padding: 16px;">
+              <div class="diag-card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <div>
+                  <h4 style="margin: 0; font-size: 15px; color: #fff;">ESP32 DevKit Link Health</h4>
+                  <span style="font-size: 11px; color: #8a96aa; font-family: monospace;">Firmware: v1.1.0</span>
+                </div>
+                <span class="badge-sensor-status" id="badge-system-link" style="background: rgba(239, 68, 68, 0.2); color: #ef4444; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">OFFLINE</span>
+              </div>
+              <table class="diag-table" style="width: 100%; font-size: 12px; line-height: 1.8;">
+                <tr><td style="color:#8a96aa;">ESP32 Connection:</td><td id="diag-esp-link-state" style="font-family:monospace; text-align:right; color:#ef4444; font-weight:bold;">DISCONNECTED</td></tr>
+                <tr><td style="color:#8a96aa;">Last Update:</td><td id="diag-sensor-last-ts" style="font-family:monospace; text-align:right; font-size:11px;">--</td></tr>
+                <tr><td style="color:#8a96aa;">Link Transport:</td><td style="font-family:monospace; text-align:right;">WebSocket / USB Serial</td></tr>
+                <tr><td style="color:#8a96aa;">Telemetry Status:</td><td id="diag-telemetry-status" style="font-family:monospace; text-align:right; color:#8a96aa;">Awaiting Packets</td></tr>
+              </table>
+            </div>
+
+          </div>
+        </section>
+
+<section id="screen-map" class="screen-view">
           <div class="view-header">
             <div>
               <h2>Tactical Wildfire GPS Map</h2>
@@ -1046,54 +1043,84 @@
         </section>
 
         <!-- ======================================================= -->
-        <!-- SCREEN 5: FIRE ALERTS -->
+        <!-- SCREEN 6: CENTRALIZED ALERT CENTER -->
         <!-- ======================================================= -->
         <section id="screen-alerts" class="screen-view">
           <div class="view-header">
             <div>
-              <h2>Fire Alerts & Incident Triage</h2>
-              <p class="section-desc">Real-time incident queue, sensor hazard evaluations, and emergency dispatch workflows.</p>
+              <div class="cockpit-title-row" style="display: flex; align-items: center; gap: 10px;">
+                <h2>Centralized Alert Center &amp; Incident Triage</h2>
+                <span class="pro-tag" style="background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">MULTI-SOURCE TRIAGE</span>
+              </div>
+              <p class="section-desc">Unified incident management consolidating real-time environmental sensor hazards (MQ-2 smoke, flame sensor) and AI vision detections (fire, smoke plumes, dangerous wildlife).</p>
             </div>
             <div class="view-actions">
-              <button id="btn-test-siren" class="btn-secondary">Test Buzzer</button>
+              <button id="btn-toggle-browser-audio" class="btn-secondary" style="display: flex; align-items: center; gap: 6px;">
+                <span id="audio-alert-icon">🔔</span>
+                <span id="audio-alert-text">Browser Audio: ON</span>
+              </button>
+              <button id="btn-ack-all-alerts" class="btn-secondary" style="font-weight: bold;">✓ Acknowledge All</button>
               <button id="btn-export-incidents" class="btn-primary">Export Incident Report (JSON)</button>
             </div>
           </div>
 
-          <!-- Active Emergency Banner -->
-          <div id="alerts-status-card" class="incident-status-card status-nominal">
-            <div class="status-card-icon" id="incident-card-icon">✓</div>
-            <div class="status-card-body">
-              <h3 id="incident-card-headline">No Emergency Hazards Active</h3>
-              <p id="incident-card-detail">Environmental telemetry indicates safe forest conditions. Audible buzzer is currently silent.</p>
+          <!-- Active Emergency Status Banner -->
+          <div id="alerts-status-card" class="incident-status-card status-nominal" style="border-radius: 8px; padding: 16px; margin-bottom: 20px; display: flex; align-items: center; gap: 16px;">
+            <div class="status-card-icon" id="incident-card-icon" style="font-size: 28px; width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(34, 197, 94, 0.2); color: #22c55e;">✓</div>
+            <div class="status-card-body" style="flex: 1;">
+              <h3 id="incident-card-headline" style="margin: 0; font-size: 16px;">No Active Hazards &bull; Forest Conditions Nominal</h3>
+              <p id="incident-card-detail" style="margin: 4px 0 0; color: #8a96aa; font-size: 12px;">Environmental hardware sensors and AI camera vision have not detected fire, smoke, or dangerous predators in recent patrol scans.</p>
             </div>
           </div>
 
-          <!-- Incident Table -->
-          <div class="table-container">
-            <table class="tactical-table">
-              <thead>
-                <tr>
-                  <th>Timestamp</th>
-                  <th>Severity</th>
-                  <th>Detection Source</th>
-                  <th>Incident Type</th>
-                  <th>GPS Location</th>
-                  <th>Verification Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody id="incidents-table-body">
-                <!-- Dynamically populated -->
-              </tbody>
-            </table>
+          <!-- Active Incidents Queue -->
+          <div class="panel-box" style="margin-bottom: 20px;">
+            <div class="panel-box-header" style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <h3 style="margin: 0;">ACTIVE INCIDENTS QUEUE</h3>
+                <p style="color: #8a96aa; font-size: 12px; margin-top: 2px;">Differentiated by source: Environmental Sensors vs. AI Camera Vision</p>
+              </div>
+              <span id="active-incident-count-pill" style="background: rgba(255,255,255,0.1); color: #cbd5e1; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-family: monospace;">0 ACTIVE</span>
+            </div>
+            
+            <div id="active-alerts-container" style="display: flex; flex-direction: column; gap: 10px; padding: 14px;">
+              <div id="empty-alerts-state" style="text-align: center; color: #8a96aa; padding: 24px; font-size: 13px;">
+                No unresolved emergencies or hazard alerts in queue.
+              </div>
+            </div>
+          </div>
+
+          <!-- Comprehensive Incident History Log Table -->
+          <div class="panel-box">
+            <div class="panel-box-header" style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <h3 style="margin: 0;">COMPLETE INCIDENT AUDIT LOG</h3>
+                <p style="color: #8a96aa; font-size: 12px; margin-top: 2px;">Chronological record of verified alarms with source tags and triage status.</p>
+              </div>
+              <button id="btn-clear-incident-history" class="btn-text-action" style="font-size: 11px;">Clear Incident History</button>
+            </div>
+            <div class="table-container" style="max-height: 320px; overflow-y: auto;">
+              <table class="tactical-table">
+                <thead>
+                  <tr>
+                    <th>TIMESTAMP</th>
+                    <th>SOURCE</th>
+                    <th>INCIDENT TYPE</th>
+                    <th>SEVERITY</th>
+                    <th>SENSOR / AI READING</th>
+                    <th>GPS LOCATION</th>
+                    <th>ACTION</th>
+                  </tr>
+                </thead>
+                <tbody id="incidents-table-body">
+                  <!-- Dynamically populated -->
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
 
-        <!-- ======================================================= -->
-        <!-- SCREEN 6: SIMULATION FLIGHT CONTROLS -->
-        <!-- ======================================================= -->
-        <section id="screen-flight" class="screen-view">
+<section id="screen-flight" class="screen-view">
           <div class="view-header flight-cockpit-header">
             <div>
               <div class="cockpit-title-row">
@@ -1395,104 +1422,7 @@
           </div>
         </section>
 
-        <!-- ======================================================= -->
-        <!-- SCREEN 7: SENSOR DIAGNOSTICS -->
-        <!-- ======================================================= -->
-        <section id="screen-diagnostics" class="screen-view">
-          <div class="view-header">
-            <div>
-              <h2>Sensor Diagnostics & Bus Health</h2>
-              <p class="section-desc">Raw bitstream and register readouts from onboard sensor hardware.</p>
-            </div>
-            <div class="view-actions">
-              <button id="btn-calibrate-baseline" class="btn-secondary">Calibrate MQ-2 Baseline</button>
-            </div>
-          </div>
-
-          <div class="diagnostics-grid">
-            <div class="diag-card">
-              <div class="diag-card-header">
-                <h4>MPU6050 6-DoF IMU (I2C 0x68)</h4>
-                <span class="diag-badge-warn" id="badge-mpu">WAITING</span>
-              </div>
-              <table class="diag-table">
-                <tr><td>Accel X / Y / Z:</td><td id="diag-accel">-- / -- / --</td></tr>
-                <tr><td>Gyro X / Y / Z:</td><td id="diag-gyro">-- / -- / --</td></tr>
-                <tr><td>Chip Temperature:</td><td id="diag-mpu-temp">-- °C</td></tr>
-                <tr><td>I2C Bus ACK:</td><td id="diag-mpu-ack" class="text-muted">Awaiting drone link...</td></tr>
-              </table>
-            </div>
-
-            <div class="diag-card">
-              <div class="diag-card-header">
-                <h4>DHT11 Environmental Sensor (GPIO 4)</h4>
-                <span class="diag-badge-warn" id="badge-dht">WAITING</span>
-              </div>
-              <table class="diag-table">
-                <tr><td>Ambient Temperature:</td><td id="diag-dht-temp">-- °C</td></tr>
-                <tr><td>Relative Humidity:</td><td id="diag-dht-humidity">-- %</td></tr>
-                <tr><td>Check-Sum Validity:</td><td id="diag-dht-valid" class="text-muted">Awaiting telemetry...</td></tr>
-                <tr><td>Sampling Rate:</td><td>0.5 Hz (2000 ms)</td></tr>
-              </table>
-            </div>
-
-            <div class="diag-card">
-              <div class="diag-card-header">
-                <h4>MQ-2 Smoke & Gas Detector (GPIO 34 ADC)</h4>
-                <span class="diag-badge-warn" id="badge-mq2">WAITING</span>
-              </div>
-              <table class="diag-table">
-                <tr><td>Raw 12-Bit ADC:</td><td id="diag-mq2-raw">-- / 4095</td></tr>
-                <tr><td>Stored Baseline:</td><td id="diag-mq2-base">--</td></tr>
-                <tr><td>Delta Above Baseline:</td><td id="diag-mq2-delta">Awaiting baseline...</td></tr>
-                <tr><td>Alarm Trigger Threshold:</td><td>Baseline + 500</td></tr>
-              </table>
-            </div>
-
-            <div class="diag-card">
-              <div class="diag-card-header">
-                <h4>Digital Flame Sensor (GPIO 27)</h4>
-                <span class="diag-badge-warn" id="badge-flame">WAITING</span>
-              </div>
-              <table class="diag-table">
-                <tr><td>Pin Logic Level:</td><td id="diag-flame-pin">Awaiting packet...</td></tr>
-                <tr><td>Trigger Polarity:</td><td>Active-LOW</td></tr>
-                <tr><td>Optical Bandwidth:</td><td>760nm - 1100nm IR</td></tr>
-                <tr><td>Detection Status:</td><td id="diag-flame-status" class="text-muted">STANDBY</td></tr>
-              </table>
-            </div>
-
-            <div class="diag-card">
-              <div class="diag-card-header">
-                <h4>NEO-6M GPS Receiver (UART2 GPIO 16/17)</h4>
-                <span class="diag-badge-warn" id="badge-gps">WAITING</span>
-              </div>
-              <table class="diag-table">
-                <tr><td>Baud Rate:</td><td>9600 8N1</td></tr>
-                <tr><td>Parsed Sentences:</td><td>$GPGGA, $GNGGA</td></tr>
-                <tr><td>Satellites in View:</td><td id="diag-gps-sats">--</td></tr>
-                <tr><td>Fix Age:</td><td id="diag-gps-age">--</td></tr>
-              </table>
-            </div>
-
-            <div class="diag-card">
-              <div class="diag-card-header">
-                <h4>Audible Alert Buzzer (GPIO 26)</h4>
-                <span class="diag-badge-ok">READY</span>
-              </div>
-              <table class="diag-table">
-                <tr><td>Pin State:</td><td id="diag-buzzer-state">LOW (Silent)</td></tr>
-                <tr><td>Autonomous Onboard Trigger:</td><td class="text-green">ENABLED</td></tr>
-                <tr><td>Failsafe Link:</td><td>Triggered on Flame / Smoke without GCS</td></tr>
-              </table>
-            </div>
-          </div>
-        </section>
-
-        <!-- ======================================================= -->
-        <!-- SCREEN 8: CONNECTION SETTINGS -->
-        <!-- ======================================================= -->
-        <section id="screen-connection" class="screen-view">
+<section id="screen-connection" class="screen-view">
           <div class="view-header">
             <div>
               <h2>Connection & Gateway Configuration</h2>
@@ -1559,10 +1489,7 @@
           </div>
         </section>
 
-        <!-- ======================================================= -->
-        <!-- SCREEN 9: EVENT HISTORY -->
-        <!-- ======================================================= -->
-        <section id="screen-history" class="screen-view">
+<section id="screen-history" class="screen-view">
           <div class="view-header">
             <div>
               <h2>Mission Event & Telemetry History</h2>
@@ -1579,10 +1506,7 @@
           </div>
         </section>
 
-        <!-- ======================================================= -->
-        <!-- SCREEN 10: ABOUT & INSTALLATION HELP -->
-        <!-- ======================================================= -->
-        <section id="screen-about" class="screen-view">
+<section id="screen-about" class="screen-view">
           <div class="view-header">
             <div>
               <h2>About SKYFIGHTER & Zero-Cost Distribution</h2>
@@ -1731,20 +1655,20 @@
         <span class="tab-icon">📊</span>
         <span class="tab-label">Dash</span>
       </button>
-      <button class="tab-btn" data-screen="livecam">
-        <span class="tab-icon">📹</span>
-        <span class="tab-label">RGB</span>
-      </button>
       <button class="tab-btn" data-screen="aistream">
-        <span class="tab-icon">🎯</span>
-        <span class="tab-label">AI:5050</span>
+        <span class="tab-icon">📹</span>
+        <span class="tab-label">AI Cam</span>
       </button>
       <button class="tab-btn" data-screen="thermal">
         <span class="tab-icon">🔥</span>
         <span class="tab-label">Thermal</span>
       </button>
+      <button class="tab-btn" data-screen="diagnostics">
+        <span class="tab-icon">🩺</span>
+        <span class="tab-label">Sensors</span>
+      </button>
       <button class="tab-btn" data-screen="map">
-        <span class="tab-icon">🗺️</span>
+        <span class="tab-icon">🛰️</span>
         <span class="tab-label">Map</span>
       </button>
       <button class="tab-btn" data-screen="alerts">
@@ -1753,7 +1677,7 @@
       </button>
       <button class="tab-btn" data-screen="flight">
         <span class="tab-icon">🕹️</span>
-        <span class="tab-label">Control</span>
+        <span class="tab-label">Flight</span>
       </button>
       <button class="tab-btn" data-screen="about">
         <span class="tab-icon">ℹ️</span>

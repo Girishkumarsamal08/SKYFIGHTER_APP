@@ -28,6 +28,87 @@ COCO_ANIMAL_MAP = {
     23: "Giraffe"
 }
 
+def get_threat_assessment(species_or_class: str) -> Dict[str, str]:
+    """Evaluates danger category, reasons, and safety actions for detected species."""
+    species = species_or_class.capitalize() if species_or_class else "Unknown"
+    matrix = {
+        "Tiger": {
+            "threat_category": "CRITICAL",
+            "threat_reason": "Apex predator - immediate threat to human life & livestock",
+            "action": "Maintain high altitude (>50m), alert rangers and ground team immediately"
+        },
+        "Leopard": {
+            "threat_category": "CRITICAL",
+            "threat_reason": "Stalking predator - severe risk to field personnel",
+            "action": "Alert ground team immediately, maintain continuous optical tracking"
+        },
+        "Elephant": {
+            "threat_category": "HIGH",
+            "threat_reason": "Massive megafauna - prone to charging when agitated",
+            "action": "Maintain standoff distance (>50m AGL), observe herd direction"
+        },
+        "Bear": {
+            "threat_category": "HIGH",
+            "threat_reason": "Aggressive territorial mammal - severe attack risk if startled",
+            "action": "Sound dissuasion alert, maintain safe separation distance"
+        },
+        "Wild Boar": {
+            "threat_category": "MODERATE",
+            "threat_reason": "Aggressive tusk charging risk if cornered",
+            "action": "Advise ground personnel to avoid dense scrub"
+        },
+        "Deer": {
+            "threat_category": "LOW",
+            "threat_reason": "Non-threatening herbivore, indicator of ecosystem activity",
+            "action": "Routine observation, log GPS coordinates"
+        },
+        "Bird": {
+            "threat_category": "LOW",
+            "threat_reason": "Aerial wildlife - potential collision risk near rotors",
+            "action": "Monitor airspace clear of rotors"
+        },
+        "Dog": {
+            "threat_category": "MODERATE",
+            "threat_reason": "Potential feral pack or companion animal",
+            "action": "Check for nearby human settlements"
+        },
+        "Cat": {
+            "threat_category": "LOW",
+            "threat_reason": "Small domestic / wild cat",
+            "action": "Routine observation"
+        },
+        "Cow": {
+            "threat_category": "LOW",
+            "threat_reason": "Livestock grazing in forest perimeter",
+            "action": "Record encroachment zone"
+        },
+        "Horse": {
+            "threat_category": "LOW",
+            "threat_reason": "Domesticated / feral equine",
+            "action": "Routine observation"
+        },
+        "Human": {
+            "threat_category": "MODERATE",
+            "threat_reason": "Ground personnel or unauthorized forest trespasser",
+            "action": "Verify ranger credentials / alert perimeter security"
+        },
+        "Person": {
+            "threat_category": "MODERATE",
+            "threat_reason": "Ground personnel or unauthorized forest trespasser",
+            "action": "Verify ranger credentials / alert perimeter security"
+        },
+        "Unknown Object": {
+            "threat_category": "MODERATE",
+            "threat_reason": "Low confidence or unclassified optical signature",
+            "action": "Re-orient camera gimbal for clear line-of-sight"
+        }
+    }
+    return matrix.get(species, {
+        "threat_category": "LOW",
+        "threat_reason": "Forest wildlife observed in patrol zone",
+        "action": "Routine observation"
+    })
+
 # Tactical HUD Theme Colors (BGR)
 COLOR_FIRE = (0, 0, 239)        # Vibrant Red (#ef4444)
 COLOR_SMOKE = (11, 158, 245)     # Amber/Smoke (#f59e0b)
@@ -207,23 +288,33 @@ class YOLOInferenceEngine:
                         xyxy = box.xyxy[0].cpu().numpy().astype(int).tolist()
 
                         if cls_id == 0 and conf >= self.conf_person: # Person
+                            t_info = get_threat_assessment("Human")
                             raw_detections.append({
                                 "class": "Person",
                                 "species": "Human",
                                 "category": "Person",
                                 "confidence": round(conf, 3),
                                 "bbox": xyxy,
-                                "model": "coco"
+                                "model": "coco",
+                                "threat_category": t_info["threat_category"],
+                                "threat_reason": t_info["threat_reason"],
+                                "action": t_info["action"],
+                                "distance": "DISTANCE UNKNOWN"
                             })
                         elif cls_id in COCO_ANIMAL_MAP and conf >= self.conf_animal:
                             species_name = COCO_ANIMAL_MAP[cls_id]
+                            t_info = get_threat_assessment(species_name)
                             raw_detections.append({
                                 "class": species_name,
                                 "species": species_name,
                                 "category": "Animal",
                                 "confidence": round(conf, 3),
                                 "bbox": xyxy,
-                                "model": "coco"
+                                "model": "coco",
+                                "threat_category": t_info["threat_category"],
+                                "threat_reason": t_info["threat_reason"],
+                                "action": t_info["action"],
+                                "distance": "DISTANCE UNKNOWN"
                             })
             except Exception as e:
                 pass
@@ -325,8 +416,23 @@ class YOLOInferenceEngine:
 
     def get_latest_snapshot(self) -> Dict[str, Any]:
         with self._lock:
+            model_connected = (self.fire_smoke_model is not None) or (self.coco_model is not None)
+            wildlife_assessments = []
+            for d in self.latest_detections:
+                if d.get("category") in ["Animal", "Person"]:
+                    wildlife_assessments.append({
+                        "species": d.get("species", d["class"]),
+                        "confidence": int(d["confidence"] * 100),
+                        "threat_category": d.get("threat_category", "LOW"),
+                        "threat_reason": d.get("threat_reason", "Routine wildlife observation"),
+                        "action": d.get("action", "Routine monitoring"),
+                        "distance": "DISTANCE UNKNOWN",
+                        "timestamp": time.strftime("%H:%M:%S")
+                    })
             return {
+                "model_connected": model_connected,
                 "active_detections": self.latest_detections,
+                "wildlife_assessments": wildlife_assessments,
                 "counts": self.latest_counts,
                 "persistence": self.persistence_count,
                 "persistence_threshold": self.persistence_threshold,

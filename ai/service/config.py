@@ -19,8 +19,8 @@ class Settings(BaseModel):
     PORT: int = int(os.getenv("PORT", "8000"))
 
     # Camera Stream Source: "simulation", "esp32_cam", or "webcam"
-    CAMERA_SOURCE: str = os.getenv("CAMERA_SOURCE", "simulation")
-    ESP32_CAM_URL: str = os.getenv("ESP32_CAM_URL", "http://192.168.4.2/stream")
+    CAMERA_SOURCE: str = os.getenv("CAMERA_SOURCE", "esp32_cam")
+    ESP32_CAM_URL: str = os.getenv("ESP32_CAM_URL", "http://192.168.4.1/stream")
     WEBCAM_INDEX: int = int(os.getenv("WEBCAM_INDEX", "0"))
     PATROL_VIDEO_PATH: str = os.getenv("PATROL_VIDEO_PATH", str(DATASET_DIR / "sample_patrol.mp4"))
 

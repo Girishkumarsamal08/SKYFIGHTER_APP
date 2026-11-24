@@ -94,9 +94,23 @@ const state = {
       humidity_pct: null,
       mq2_adc: null,
       flame_detected: null,
+      buzzer_active: false,
       mpu_connected: false,
-      mpu_temperature_c: null
+      mpu_temperature_c: null,
+      lcd_line1: 'FG: SENSORS OK',
+      lcd_line2: 'SMK:SAFE FLM:NO',
+      esp32_connected: false,
+      last_update_ts: null
     },
+    smokeWarnThreshold: 1200,
+    smokeCritThreshold: 2400,
+    browserAudioAlertsEnabled: true,
+    activeAlerts: [],
+    thermalViewMode: 'dual',
+    thermalPalette: 'ironbow',
+    thermalGain: 1.0,
+    thermalHotspotThreshold: 0.70,
+    cameraStreamUrl: 'http://192.168.4.1/stream',
     gps: {
       valid: false,
       latitude: null,
@@ -484,6 +498,236 @@ function maybeRecordIncident(hazard, lat, lon, temp) {
   }
 }
 
+
+// ========================================================
+// CENTRALIZED ALERT CENTER & INCIDENT MANAGEMENT
+// ========================================================
+function syncAlertCenter() {
+  const container = document.getElementById('active-alerts-container');
+  const countPill = document.getElementById('active-incident-count-pill');
+  const statusHeadline = document.getElementById('incident-card-headline');
+  const statusDetail = document.getElementById('incident-card-detail');
+  const statusIcon = document.getElementById('incident-card-icon');
+  const statusCard = document.getElementById('alerts-status-card');
+
+  if (!container) return;
+  const count = state.activeAlerts ? state.activeAlerts.length : 0;
+  if (countPill) countPill.textContent = `${count} ACTIVE`;
+
+  if (count === 0) {
+    container.innerHTML = `
+      <div id="empty-alerts-state" style="text-align: center; color: #8a96aa; padding: 24px; font-size: 13px;">
+        No unresolved emergencies or hazard alerts in queue.
+      </div>
+    `;
+    if (statusHeadline) statusHeadline.textContent = 'No Active Hazards • Forest Conditions Nominal';
+    if (statusDetail) statusDetail.textContent = 'Environmental hardware sensors and AI camera vision have not detected fire, smoke, or dangerous predators in recent patrol scans.';
+    if (statusIcon) {
+      statusIcon.textContent = '✓';
+      statusIcon.style.background = 'rgba(34, 197, 94, 0.2)';
+      statusIcon.style.color = '#22c55e';
+    }
+    if (statusCard) {
+      statusCard.className = 'incident-status-card status-nominal';
+    }
+    return;
+  }
+
+  // Active hazard state
+  if (statusHeadline) statusHeadline.textContent = `⚠️ ACTIVE HAZARDS IN PATROL SECTOR (${count})`;
+  if (statusDetail) statusDetail.textContent = 'Immediate attention required. Verify environmental sensor readings and live video feed.';
+  if (statusIcon) {
+    statusIcon.textContent = '!';
+    statusIcon.style.background = 'rgba(239, 68, 68, 0.2)';
+    statusIcon.style.color = '#ef4444';
+  }
+  if (statusCard) {
+    statusCard.className = 'incident-status-card status-critical';
+  }
+
+  let html = '';
+  state.activeAlerts.forEach((alt) => {
+    const cardClass = alt.severity === 'CRITICAL' ? 'crit-hazard' : (alt.severity === 'HIGH' ? 'warn-hazard' : 'info-hazard');
+    const sourceClass = alt.source_type === 'HARDWARE' ? 'source-hw' : 'source-ai';
+    const sourceLabel = alt.source_type === 'HARDWARE' ? 'HARDWARE SENSOR' : 'AI CAMERA VISION';
+    
+    html += `
+      <div class="alert-item-card ${cardClass}" id="alert-card-${alt.id}">
+        <div style="flex: 1;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+            <span class="alert-source-pill ${sourceClass}">[${sourceLabel}]</span>
+            <span class="badge-severity badge-${alt.severity.toLowerCase()}" style="font-size: 10px; padding: 2px 6px;">${alt.severity}</span>
+            <strong style="color: #fff; font-size: 13px;">${alt.title}</strong>
+          </div>
+          <p style="margin: 0; color: #cbd5e1; font-size: 12px; line-height: 1.4;">${alt.description}</p>
+          <div style="display: flex; gap: 12px; margin-top: 6px; font-size: 10px; color: #8a96aa; font-family: monospace;">
+            <span>TIME: ${alt.timeStr}</span>
+            <span>LOCATION: ${alt.coords || 'SECTOR ALPHA'}</span>
+            <span>SENSOR: ${alt.sensor_detail || 'GPIO 34/27'}</span>
+          </div>
+        </div>
+        <button class="btn-action-sm" onclick="window.acknowledgeAlert('${alt.id}')" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 6px 12px; border-radius: 4px; font-size: 11px; font-weight: bold; cursor: pointer;">
+          ✓ Acknowledge
+        </button>
+      </div>
+    `;
+  });
+  container.innerHTML = html;
+}
+
+window.acknowledgeAlert = function(id) {
+  if (!state.activeAlerts) return;
+  const idx = state.activeAlerts.findIndex(a => a.id === id);
+  if (idx !== -1) {
+    const [ack] = state.activeAlerts.splice(idx, 1);
+    logEvent('ALERT', `Alert ${ack.id} acknowledged: ${ack.title}`);
+    syncAlertCenter();
+    updateAlertCounter();
+  }
+};
+
+function addActiveAlert(alertObj) {
+  if (!state.activeAlerts) state.activeAlerts = [];
+  const exists = state.activeAlerts.some(a => a.type === alertObj.type && (Date.now() - a.timestamp_ms < 10000));
+  if (!exists) {
+    state.activeAlerts.unshift(alertObj);
+    if (state.activeAlerts.length > 25) state.activeAlerts.pop();
+    
+    // Also log to history
+    state.incidents.unshift({
+      id: alertObj.id,
+      timestamp_ms: alertObj.timestamp_ms,
+      timeStr: alertObj.timeStr,
+      severity: alertObj.severity,
+      source: alertObj.source_type === 'HARDWARE' ? 'ESP32 Hardware' : 'AI Vision',
+      type: alertObj.title,
+      coords: alertObj.coords,
+      status: 'active',
+      maxTempC: 0
+    });
+    if (state.incidents.length > 50) state.incidents.pop();
+
+    if (state.browserAudioAlertsEnabled) {
+      playBuzzer(true);
+    }
+    syncAlertCenter();
+    renderIncidentsTable();
+    updateAlertCounter();
+  }
+}
+
+// Pseudo-Thermal False Color Mapping (Luminance to RGB)
+function getThermalColor(tNorm, paletteName = 'ironbow') {
+  const t = Math.max(0, Math.min(1, tNorm));
+  if (paletteName === 'whitehot') {
+    const v = Math.floor(t * 255);
+    return [v, v, v];
+  } else if (paletteName === 'inferno') {
+    if (t < 0.25) {
+      const f = t / 0.25;
+      return [Math.floor(64 * f), 0, Math.floor(128 * f)];
+    } else if (t < 0.5) {
+      const f = (t - 0.25) / 0.25;
+      return [Math.floor(64 + 140 * f), 0, Math.floor(128 - 60 * f)];
+    } else if (t < 0.75) {
+      const f = (t - 0.5) / 0.25;
+      return [Math.floor(204 + 51 * f), Math.floor(160 * f), 30];
+    } else {
+      const f = (t - 0.75) / 0.25;
+      return [255, Math.floor(160 + 95 * f), Math.floor(30 + 225 * f)];
+    }
+  } else if (paletteName === 'rainbow') {
+    if (t < 0.25) {
+      const f = t / 0.25;
+      return [0, Math.floor(255 * f), 255];
+    } else if (t < 0.5) {
+      const f = (t - 0.25) / 0.25;
+      return [0, 255, Math.floor(255 * (1 - f))];
+    } else if (t < 0.75) {
+      const f = (t - 0.5) / 0.25;
+      return [Math.floor(255 * f), 255, 0];
+    } else {
+      const f = (t - 0.75) / 0.25;
+      return [255, Math.floor(255 * (1 - f)), 0];
+    }
+  } else {
+    // Ironbow (Default)
+    if (t < 0.2) {
+      const f = t / 0.2;
+      return [Math.floor(5 + 25 * f), Math.floor(5 + 20 * f), Math.floor(40 + 70 * f)];
+    } else if (t < 0.4) {
+      const f = (t - 0.2) / 0.2;
+      return [Math.floor(30 + 80 * f), 25, Math.floor(110 + 60 * f)];
+    } else if (t < 0.6) {
+      const f = (t - 0.4) / 0.2;
+      return [Math.floor(110 + 115 * f), Math.floor(25 + 30 * f), Math.floor(170 - 130 * f)];
+    } else if (t < 0.8) {
+      const f = (t - 0.6) / 0.2;
+      return [225, Math.floor(55 + 145 * f), Math.floor(40 * (1 - f))];
+    } else {
+      const f = (t - 0.8) / 0.2;
+      return [255, Math.floor(200 + 55 * f), Math.floor(255 * f)];
+    }
+  }
+}
+
+function updateWildlifeThreatTable(assessments, isModelConnected = true) {
+  const tbody = document.getElementById('wildlife-threat-tbody');
+  const modelPill = document.getElementById('ai-model-status-pill');
+  if (modelPill) {
+    if (isModelConnected) {
+      modelPill.textContent = 'MODEL STATUS: READY';
+      modelPill.style.background = 'rgba(34, 197, 94, 0.15)';
+      modelPill.style.borderColor = '#22c55e';
+      modelPill.style.color = '#22c55e';
+    } else {
+      modelPill.textContent = 'MODEL NOT CONNECTED';
+      modelPill.style.background = 'rgba(239, 68, 68, 0.15)';
+      modelPill.style.borderColor = '#ef4444';
+      modelPill.style.color = '#ef4444';
+    }
+  }
+
+  if (!tbody) return;
+
+  if (!isModelConnected) {
+    tbody.innerHTML = `<tr>
+      <td colspan="7" style="text-align: center; color: #ef4444; padding: 24px; font-weight: bold;">
+        ⚠️ MODEL NOT CONNECTED — Awaiting AI Vision Inference Service (:8000)
+      </td>
+    </tr>`;
+    return;
+  }
+
+  if (!assessments || assessments.length === 0) {
+    tbody.innerHTML = `<tr>
+      <td colspan="7" style="text-align: center; color: #8a96aa; padding: 24px;">
+        Scanning forest canopy for wildlife species. No hazardous fauna in immediate FOV.
+      </td>
+    </tr>`;
+    return;
+  }
+
+  let html = '';
+  assessments.forEach(item => {
+    let catClass = 'badge-threat-low';
+    if (item.threat_category === 'CRITICAL') catClass = 'badge-threat-critical';
+    else if (item.threat_category === 'HIGH') catClass = 'badge-threat-high';
+    else if (item.threat_category === 'MODERATE') catClass = 'badge-threat-mod';
+
+    html += `<tr>
+      <td><strong>${item.species}</strong></td>
+      <td style="font-family: monospace; color: #22c55e; font-weight: bold;">${item.confidence}%</td>
+      <td><span class="${catClass}">${item.threat_category}</span></td>
+      <td style="font-size: 11px; color: #cbd5e1;">${item.threat_reason}</td>
+      <td style="font-family: monospace; font-size: 11px;">${item.timestamp}</td>
+      <td style="font-size: 11px; color: #38bdf8;">${item.action}</td>
+      <td><span class="distance-unknown-pill">DISTANCE UNKNOWN</span></td>
+    </tr>`;
+  });
+  tbody.innerHTML = html;
+}
+
 function renderTelemetryUI() {
   const t = state.telemetry;
   const s = t.sensors;
@@ -511,6 +755,9 @@ function renderTelemetryUI() {
   if (simToggleBtn) {
     simToggleBtn.classList.toggle('active', isSim);
   }
+
+  const warnThresh = state.smokeWarnThreshold || 1200;
+  const critThresh = state.smokeCritThreshold || 2400;
 
   if (!isLive && !isSim) {
     // ----------------------------------------------------
@@ -581,75 +828,42 @@ function renderTelemetryUI() {
     setElemText('map-sats', 'GPS Offline');
     setElemText('map-drone-pos', 'DRONE: NOT CONNECTED');
 
-    // Diagnostics Standby Readouts
-    setElemText('diag-accel', '-- / -- / --');
-    setElemText('diag-gyro', '-- / -- / --');
-    setElemText('diag-mpu-temp', '-- °C');
-    setElemText('diag-mpu-ack', 'Drone not connected');
-    setElemClass('badge-mpu', 'diag-badge-warn');
-    setElemText('badge-mpu', 'OFFLINE');
+    // Real Hardware Sensor Monitoring Cards (SCREEN 4) Standby
+    setElemText('val-mq2-raw-ao', '-- / 4095');
+    setElemStyle('bar-mq2-fill', 'width', '0%');
+    setElemText('status-smoke-badge', 'OFFLINE');
+    setElemStyle('status-smoke-badge', 'background', 'rgba(255,255,255,0.1)');
+    setElemStyle('status-smoke-badge', 'color', '#8a96aa');
 
-    setElemText('diag-dht-temp', '-- °C');
-    setElemText('diag-dht-humidity', '-- %');
-    setElemText('diag-dht-valid', 'Drone not connected');
-    setElemClass('badge-dht', 'diag-badge-warn');
-    setElemText('badge-dht', 'OFFLINE');
+    setElemText('status-flame-badge', 'OFFLINE');
+    setElemStyle('status-flame-badge', 'background', 'rgba(255,255,255,0.1)');
+    setElemStyle('status-flame-badge', 'color', '#8a96aa');
+    setElemText('val-flame-pin-level', 'Awaiting packet...');
+    setElemText('flame-sensor-state-text', 'STANDBY (Awaiting ESP32)');
+    setElemStyle('flame-sensor-icon', 'filter', 'grayscale(1)');
+    setElemStyle('flame-sensor-icon', 'opacity', '0.4');
 
-    setElemText('diag-mq2-raw', '-- / 4095');
-    setElemText('diag-mq2-base', '--');
-    setElemText('diag-mq2-delta', 'Drone not connected');
-    setElemClass('badge-mq2', 'diag-badge-warn');
-    setElemText('badge-mq2', 'OFFLINE');
+    setElemText('status-buzzer-badge', 'OFF');
+    setElemText('val-buzzer-state-text', 'BUZZER: OFF (SILENT)');
 
-    setElemText('diag-flame-pin', 'Offline');
-    setElemText('diag-flame-status', 'NOT CONNECTED');
-    setElemClass('badge-flame', 'diag-badge-warn');
-    setElemText('badge-flame', 'OFFLINE');
+    setElemText('diag-gps-lat', '--');
+    setElemText('diag-gps-lon', '--');
+    setElemText('diag-gps-sat-count', '-- Locked');
+    setElemText('diag-gps-fix-type', 'Awaiting Lock');
+    setElemText('status-gps-diag-badge', 'OFFLINE');
+    setElemStyle('status-gps-diag-badge', 'background', 'rgba(239,68,68,0.2)');
+    setElemStyle('status-gps-diag-badge', 'color', '#ef4444');
 
-    setElemText('diag-gps-sats', '--');
-    setElemText('diag-gps-age', '--');
-    setElemClass('badge-gps', 'diag-badge-warn');
-    setElemText('badge-gps', 'OFFLINE');
+    setElemText('lcd-line-1', 'FG: OFFLINE     ');
+    setElemText('lcd-line-2', 'AWAITING LINK...');
 
-    // Standby for Comprehensive Sensor Cards
-    setElemText('val-temp-f', '-- °F');
-    setElemText('status-temp', 'OFFLINE');
-    setElemClass('status-temp', 'badge-sensor-status badge-warn');
-
-    setElemText('sub-humidity-risk', 'Sensor offline');
-    setElemText('status-humidity', 'OFFLINE');
-    setElemClass('status-humidity', 'badge-sensor-status badge-warn');
-
-    setElemText('val-smoke-ppm', 'Est: -- PPM');
-    setElemText('status-smoke', 'OFFLINE');
-    setElemClass('status-smoke', 'badge-sensor-status badge-warn');
-
-    setElemText('status-flame', 'OFFLINE');
-    setElemClass('status-flame', 'badge-sensor-status badge-warn');
-
-    setElemText('val-batt-pct', '-- %');
-    setElemStyle('bar-batt', 'width', '0%');
-    setElemText('sub-batt-voltage', 'Pack Voltage: -- V | Current: -- A');
-    setElemText('cell-v-1', '--V');
-    setElemText('cell-v-2', '--V');
-    setElemText('cell-v-3', '--V');
-    setElemText('cell-v-4', '--V');
-
-    setElemText('gps-hdop-val', 'HDOP: --');
-    setElemText('status-gps', 'NO FIX');
-    setElemClass('status-gps', 'badge-sensor-status badge-warn');
-
-    setElemText('val-pressure', '-- hPa');
-    setElemText('val-pressure-inhg', '-- inHg');
-    setElemStyle('bar-pressure', 'width', '0%');
-    setElemText('sub-pressure', 'Atmospheric sensor standby');
-
-    setElemText('val-rssi', '-- dBm');
-    setElemStyle('bar-rssi', 'width', '0%');
-    setElemText('sub-rssi', 'Link disconnected');
-    setElemText('link-latency-detail', 'Ping: -- ms');
-    setElemText('status-link', 'DISCONNECTED');
-    setElemClass('status-link', 'badge-sensor-status badge-warn');
+    setElemText('esp32-hw-conn-badge', 'ESP32: DISCONNECTED');
+    setElemStyle('esp32-hw-conn-badge', 'background', 'rgba(239,68,68,0.2)');
+    setElemStyle('esp32-hw-conn-badge', 'color', '#ef4444');
+    setElemText('badge-system-link', 'OFFLINE');
+    setElemText('diag-esp-link-state', 'DISCONNECTED');
+    setElemText('diag-sensor-last-ts', '--');
+    setElemText('diag-telemetry-status', 'Awaiting Packets');
 
     // Standby Mini-Instruments
     setElemText('dash-roll-deg', 'R: 0.0°');
@@ -673,9 +887,7 @@ function renderTelemetryUI() {
     setElemText('hud-flight-heading', '--°');
     setElemText('hud-flight-link', 'OFFLINE');
 
-    // Clear any fake incidents when disconnected
-    state.incidents = [];
-    updateAlertCounter();
+    syncAlertCenter();
     renderIncidentsTable();
     return;
   }
@@ -703,140 +915,215 @@ function renderTelemetryUI() {
     armedLabel.textContent = f.armed ? (isSim ? 'ARMED (SIM)' : 'ARMED') : 'DISARMED';
   }
 
-  // 1. Ambient Temperature
-  if (s && s.temperature_c !== null) {
-    setElemText('val-temp', `${s.temperature_c} °C`);
-    const tempF = (s.temperature_c * 9 / 5 + 32).toFixed(1);
-    setElemText('val-temp-f', `${tempF} °F`);
-    const tPct = Math.min(100, Math.max(0, (s.temperature_c / 60) * 100));
-    setElemStyle('bar-temp', 'width', `${tPct}%`);
-    const isHot = s.temperature_c > 45;
-    setElemText('sub-temp', isHot ? 'Elevated ambient heat' : 'Nominal canopy temperature');
-    setElemText('status-temp', isHot ? 'HIGH HEAT' : 'NOMINAL');
-    setElemClass('status-temp', `badge-sensor-status ${isHot ? 'badge-alert' : 'badge-ok'}`);
-  } else {
-    setElemText('val-temp', '-- °C');
-    setElemStyle('bar-temp', 'width', '0%');
-  }
+  const mq2Val = s && s.mq2_adc !== null ? s.mq2_adc : 420;
+  const flameDetected = s && s.flame_detected === true;
 
-  // 2. Relative Humidity
-  if (s && s.humidity_pct !== null) {
-    setElemText('val-humidity', `${s.humidity_pct} %`);
-    const hPct = Math.min(100, Math.max(0, s.humidity_pct));
-    setElemStyle('bar-humidity', 'width', `${hPct}%`);
-    const isDry = s.humidity_pct < 30;
-    setElemText('sub-humidity', isDry ? 'Dry fuel condition (<30%)' : 'Nominal relative humidity');
-    setElemText('sub-humidity-risk', isDry ? 'High Wildfire Risk' : 'Fuel moisture: Normal');
-    setElemText('status-humidity', isDry ? 'DRY FUEL' : 'NORMAL');
-    setElemClass('status-humidity', `badge-sensor-status ${isDry ? 'badge-warn' : 'badge-ok'}`);
-  } else {
-    setElemText('val-humidity', '-- %');
-    setElemStyle('bar-humidity', 'width', '0%');
-  }
-
-  // 3. Smoke / MQ-2
+  // 1. MQ-2 Smoke Sensor (Real Hardware GPIO 34 AO)
   if (s && s.mq2_adc !== null) {
     setElemText('val-smoke', `${s.mq2_adc} ADC`);
+    setElemText('val-mq2-raw-ao', `${s.mq2_adc} / 4095`);
     const sPct = Math.min(100, Math.max(0, (s.mq2_adc / 4095) * 100));
     setElemStyle('bar-smoke', 'width', `${sPct}%`);
-    const isHighGas = s.mq2_adc > 900;
-    setElemText('sub-smoke', isHighGas ? 'High combustion gas level!' : 'Clean air baseline');
-    const estPpm = Math.round(s.mq2_adc / 18);
-    setElemText('val-smoke-ppm', `Est: ~${estPpm} PPM`);
-    setElemText('status-smoke', isHighGas ? 'COMBUSTION' : 'CLEAN');
-    setElemClass('status-smoke', `badge-sensor-status ${isHighGas ? 'badge-alert' : 'badge-ok'}`);
-  } else {
-    setElemText('val-smoke', '-- ADC');
-    setElemStyle('bar-smoke', 'width', '0%');
+    setElemStyle('bar-mq2-fill', 'width', `${sPct}%`);
+
+    const badgeSmoke = document.getElementById('status-smoke-badge');
+    const barMq2 = document.getElementById('bar-mq2-fill');
+
+    if (s.mq2_adc >= critThresh) {
+      if (badgeSmoke) {
+        badgeSmoke.textContent = 'CRITICAL';
+        badgeSmoke.style.background = '#ef4444';
+        badgeSmoke.style.color = '#ffffff';
+      }
+      if (barMq2) barMq2.style.background = '#ef4444';
+      setElemText('status-smoke', 'CRITICAL');
+      setElemClass('status-smoke', 'badge-sensor-status badge-alert');
+      addActiveAlert({
+        id: 'ALERT-MQ2-CRIT',
+        severity: 'CRITICAL',
+        source_type: 'HARDWARE',
+        title: 'Critical Smoke Level (GPIO 34)',
+        description: `MQ-2 sensor raw reading of ${s.mq2_adc} ADC exceeds critical threshold (${critThresh}). Immediate hazard!`,
+        timeStr: new Date().toLocaleTimeString(),
+        coords: g && g.valid ? `${g.latitude.toFixed(6)}, ${g.longitude.toFixed(6)}` : 'SECTOR ALPHA',
+        sensor_detail: `GPIO 34 ADC: ${s.mq2_adc}`
+      });
+    } else if (s.mq2_adc >= warnThresh) {
+      if (badgeSmoke) {
+        badgeSmoke.textContent = 'WARNING';
+        badgeSmoke.style.background = '#f59e0b';
+        badgeSmoke.style.color = '#000000';
+      }
+      if (barMq2) barMq2.style.background = '#f59e0b';
+      setElemText('status-smoke', 'WARNING');
+      setElemClass('status-smoke', 'badge-sensor-status badge-warn');
+      addActiveAlert({
+        id: 'ALERT-MQ2-WARN',
+        severity: 'HIGH',
+        source_type: 'HARDWARE',
+        title: 'Elevated Smoke Anomaly (GPIO 34)',
+        description: `MQ-2 sensor raw reading of ${s.mq2_adc} ADC crossed warning threshold (${warnThresh}).`,
+        timeStr: new Date().toLocaleTimeString(),
+        coords: g && g.valid ? `${g.latitude.toFixed(6)}, ${g.longitude.toFixed(6)}` : 'SECTOR ALPHA',
+        sensor_detail: `GPIO 34 ADC: ${s.mq2_adc}`
+      });
+    } else {
+      if (badgeSmoke) {
+        badgeSmoke.textContent = 'SAFE';
+        badgeSmoke.style.background = '#22c55e';
+        badgeSmoke.style.color = '#000000';
+      }
+      if (barMq2) barMq2.style.background = '#22c55e';
+      setElemText('status-smoke', 'CLEAN');
+      setElemClass('status-smoke', 'badge-sensor-status badge-ok');
+    }
   }
 
-  // 4. Optical Flame Detector
+  // 2. Optical Flame Sensor (GPIO 27 DO, Active-LOW)
   const valFlame = document.getElementById('val-flame');
-  if (valFlame) {
-    if (s && s.flame_detected === true) {
+  const badgeFlame = document.getElementById('status-flame-badge');
+  const flameIcon = document.getElementById('flame-sensor-icon');
+  const flameText = document.getElementById('flame-sensor-state-text');
+  const flamePinLevel = document.getElementById('val-flame-pin-level');
+
+  if (flameDetected) {
+    if (valFlame) {
       valFlame.textContent = 'ACTIVE FLAME!';
       valFlame.className = 'metric-value flame-alert';
-      setElemStyle('bar-flame', 'width', '100%');
-      setElemText('sub-flame', 'Optical IR wavelength triggered');
-      setElemText('status-flame', 'ALERT: FLAME');
-      setElemClass('status-flame', 'badge-sensor-status badge-alert');
-    } else if (s && s.flame_detected === false) {
+    }
+    if (badgeFlame) {
+      badgeFlame.textContent = '🔥 DETECTED';
+      badgeFlame.style.background = '#ef4444';
+      badgeFlame.style.color = '#ffffff';
+    }
+    if (flameIcon) {
+      flameIcon.style.filter = 'none';
+      flameIcon.style.opacity = '1.0';
+    }
+    if (flameText) {
+      flameText.textContent = '🔥 FLAME DETECTED!';
+      flameText.style.color = '#ef4444';
+    }
+    if (flamePinLevel) flamePinLevel.textContent = 'LOW (0.0V - Active Flame)';
+    setElemText('status-flame', 'ALERT: FLAME');
+    setElemClass('status-flame', 'badge-sensor-status badge-alert');
+
+    addActiveAlert({
+      id: 'ALERT-FLAME-HW',
+      severity: 'CRITICAL',
+      source_type: 'HARDWARE',
+      title: 'Active Flame Detected (GPIO 27)',
+      description: 'Optical flame sensor DO pin triggered Active-LOW (0V). Infrared combustion radiation detected.',
+      timeStr: new Date().toLocaleTimeString(),
+      coords: g && g.valid ? `${g.latitude.toFixed(6)}, ${g.longitude.toFixed(6)}` : 'SECTOR ALPHA',
+      sensor_detail: 'GPIO 27: LOW (0V)'
+    });
+  } else {
+    if (valFlame) {
       valFlame.textContent = 'CLEAR';
       valFlame.className = 'metric-value flame-safe';
-      setElemStyle('bar-flame', 'width', '0%');
-      setElemText('sub-flame', 'No optical flame detected');
-      setElemText('status-flame', 'SAFE');
-      setElemClass('status-flame', 'badge-sensor-status badge-ok');
-    } else {
-      valFlame.textContent = 'WAITING';
-      valFlame.className = 'metric-value text-dim';
-      setElemText('sub-flame', 'Awaiting optical sensor packet...');
-      setElemText('status-flame', 'STANDBY');
-      setElemClass('status-flame', 'badge-sensor-status badge-warn');
+    }
+    if (badgeFlame) {
+      badgeFlame.textContent = 'NOT DETECTED';
+      badgeFlame.style.background = '#22c55e';
+      badgeFlame.style.color = '#000000';
+    }
+    if (flameIcon) {
+      flameIcon.style.filter = 'grayscale(1)';
+      flameIcon.style.opacity = '0.4';
+    }
+    if (flameText) {
+      flameText.textContent = 'CLEAR (NO FLAME)';
+      flameText.style.color = '#22c55e';
+    }
+    if (flamePinLevel) flamePinLevel.textContent = 'HIGH (3.3V - Standby)';
+    setElemText('status-flame', 'SAFE');
+    setElemClass('status-flame', 'badge-sensor-status badge-ok');
+  }
+
+  // 3. Hardware Buzzer (GPIO 25)
+  const buzzerActive = (s && s.buzzer_active) || flameDetected || (mq2Val >= critThresh);
+  const badgeBuzzer = document.getElementById('status-buzzer-badge');
+  const buzzerIcon = document.getElementById('buzzer-sensor-icon');
+  const buzzerText = document.getElementById('val-buzzer-state-text');
+  if (buzzerActive) {
+    if (badgeBuzzer) {
+      badgeBuzzer.textContent = 'ON (ALARM)';
+      badgeBuzzer.style.background = '#ef4444';
+      badgeBuzzer.style.color = '#ffffff';
+    }
+    if (buzzerIcon) buzzerIcon.textContent = '🔊';
+    if (buzzerText) {
+      buzzerText.textContent = 'BUZZER: ACTIVE (ALARM)';
+      buzzerText.style.color = '#ef4444';
+    }
+  } else {
+    if (badgeBuzzer) {
+      badgeBuzzer.textContent = 'OFF';
+      badgeBuzzer.style.background = 'rgba(255,255,255,0.1)';
+      badgeBuzzer.style.color = '#8a96aa';
+    }
+    if (buzzerIcon) buzzerIcon.textContent = '🔇';
+    if (buzzerText) {
+      buzzerText.textContent = 'BUZZER: OFF (SILENT)';
+      buzzerText.style.color = '#8a96aa';
     }
   }
 
-  // 5. 4S LiPo Battery System
-  if (state.battery) {
-    const battPct = Math.round(state.battery.percentage || 98);
-    setElemText('val-batt-pct', `${battPct} %`);
-    setElemStyle('bar-batt', 'width', `${battPct}%`);
-    setElemText('sub-batt-voltage', `Pack: ${state.battery.voltage_v || 15.6}V | Current: ${state.battery.current_a || 1.2}A`);
-    if (state.battery.cells && state.battery.cells.length >= 4) {
-      setElemText('cell-v-1', `${state.battery.cells[0]}V`);
-      setElemText('cell-v-2', `${state.battery.cells[1]}V`);
-      setElemText('cell-v-3', `${state.battery.cells[2]}V`);
-      setElemText('cell-v-4', `${state.battery.cells[3]}V`);
-    }
-    const battPill = document.getElementById('battery-label');
-    if (battPill) battPill.textContent = `BATTERY: ${battPct}% (${state.battery.voltage_v || 15.6}V)`;
-  }
-
-  // 6. GPS Positioning
-  if (g && g.valid && g.latitude !== null && g.longitude !== null) {
+  // 4. GPS Receiver NEO-7M (GPIO 16, 17)
+  const gValid = g && g.valid && g.latitude !== null && g.longitude !== null;
+  if (gValid) {
     setElemText('val-coords', `${g.latitude.toFixed(6)}, ${g.longitude.toFixed(6)}`);
-    setElemText('sub-gps', `Alt: ${g.altitude_m}m | Sats: ${g.satellites}`);
-    setElemStyle('bar-gps', 'width', '100%');
-    setElemText('gps-hdop-val', 'HDOP: 0.80 (EXCELLENT)');
-    setElemText('status-gps', `3D FIX (${g.satellites} Sats)`);
-    setElemClass('status-gps', 'badge-sensor-status badge-ok');
-
+    setElemText('sub-gps', `Alt: ${g.altitude_m}m | Sats: ${g.satellites || 9}`);
+    setElemText('diag-gps-lat', `${g.latitude.toFixed(6)}°`);
+    setElemText('diag-gps-lon', `${g.longitude.toFixed(6)}°`);
+    setElemText('diag-gps-sat-count', `${g.satellites || 9} Locked`);
+    setElemText('diag-gps-fix-type', 'Differential 3D Fix');
+    const badgeGpsDiag = document.getElementById('status-gps-diag-badge');
+    if (badgeGpsDiag) {
+      badgeGpsDiag.textContent = '3D FIX LOCKED';
+      badgeGpsDiag.style.background = '#22c55e';
+      badgeGpsDiag.style.color = '#000000';
+    }
     setElemText('map-lat', `${g.latitude.toFixed(6)}°`);
     setElemText('map-lon', `${g.longitude.toFixed(6)}°`);
-    setElemText('map-alt', `${g.altitude_m} m`);
-    setElemText('map-sats', `${g.satellites} Locked (3D Fix)`);
+    setElemText('map-alt', `${g.altitude_m || 24.5} m`);
+    setElemText('map-sats', `${g.satellites || 9} Locked (3D Fix)`);
     setElemText('map-drone-pos', `DRONE: ${g.latitude.toFixed(6)} N, ${g.longitude.toFixed(6)} E`);
     if (gpsPill && gpsLabel) {
       gpsPill.className = 'status-pill status-armed';
-      gpsLabel.textContent = `GPS: 3D FIX (${g.satellites})`;
-    }
-  } else {
-    setElemText('val-coords', 'NO GPS FIX');
-    setElemText('sub-gps', 'Antenna outdoors required');
-    setElemText('status-gps', 'NO FIX');
-    setElemClass('status-gps', 'badge-sensor-status badge-warn');
-    if (gpsPill && gpsLabel) {
-      gpsPill.className = 'status-pill status-disarmed';
-      gpsLabel.textContent = 'GPS: NO FIX';
+      gpsLabel.textContent = `GPS: 3D FIX (${g.satellites || 9})`;
     }
   }
 
-  // 7. Barometric Pressure
-  setElemText('val-pressure', `${state.pressure_hpa || 1013.25} hPa`);
-  const inHg = ((state.pressure_hpa || 1013.25) * 0.02953).toFixed(2);
-  setElemText('val-pressure-inhg', `${inHg} inHg`);
-  setElemStyle('bar-pressure', 'width', `${Math.min(100, Math.max(0, ((state.pressure_hpa || 1013.25) - 950) / 100 * 100))}%`);
-  setElemText('sub-pressure', `Density Alt: ~${Math.round((state.altitude_m || 0) * 3.28)} ft MSL`);
+  // 5. Local LCD (GPIO 21, 22)
+  const lcd1 = document.getElementById('lcd-line-1');
+  const lcd2 = document.getElementById('lcd-line-2');
+  const l1 = flameDetected ? 'FG: FIRE ALERT! ' : (mq2Val >= warnThresh ? 'FG: SMOKE WARN! ' : 'FG: SENSORS OK  ');
+  const l2 = `SMK:${mq2Val || 0} FLM:${flameDetected ? 'YES' : 'NO'}`.padEnd(16, ' ');
+  if (lcd1) lcd1.textContent = l1;
+  if (lcd2) lcd2.textContent = l2;
 
-  // 8. Radio Link Quality
-  setElemText('val-rssi', `${state.rssi_dbm || -52} dBm`);
-  setElemStyle('bar-rssi', 'width', `${Math.min(100, Math.max(0, (100 + (state.rssi_dbm || -52)) * 2))}%`);
-  setElemText('sub-rssi', 'Wi-Fi 2.4GHz Link Nominal');
-  setElemText('link-latency-detail', `Ping: ${state.isSimulation ? '14' : state.telemetryAgeMs} ms`);
-  setElemText('status-link', 'OPTIMAL');
-  setElemClass('status-link', 'badge-sensor-status badge-ok');
+  // 6. ESP32 DevKit Link Health
+  const nowTimeStr = new Date().toLocaleTimeString();
+  const espBadge = document.getElementById('esp32-hw-conn-badge');
+  if (espBadge) {
+    espBadge.textContent = 'ESP32: ONLINE';
+    espBadge.style.background = 'rgba(34, 197, 94, 0.2)';
+    espBadge.style.color = '#22c55e';
+    espBadge.style.borderColor = '#22c55e';
+  }
+  const badgeSys = document.getElementById('badge-system-link');
+  if (badgeSys) {
+    badgeSys.textContent = 'ONLINE';
+    badgeSys.style.background = '#22c55e';
+    badgeSys.style.color = '#000000';
+  }
+  setElemText('diag-esp-link-state', 'CONNECTED');
+  setElemText('diag-sensor-last-ts', nowTimeStr);
+  setElemText('diag-telemetry-status', 'Active Telemetry Stream');
 
-  // Dashboard Mini-Instruments & PFD
+  // Mini-Instruments & PFD
   const rollDeg = (state.sticks.roll * 25);
   const pitchDeg = (state.sticks.pitch * 20);
   const heading = state.heading_deg || 180;
@@ -861,7 +1148,7 @@ function renderTelemetryUI() {
     miniCompassNeedle.style.transform = `rotate(${heading}deg)`;
   }
 
-  // Cockpit Ribbon Updates
+  // Cockpit Ribbon
   setElemText('hud-flight-arm', state.isArmed ? 'ARMED' : 'DISARMED');
   setElemClass('hud-flight-arm', `hud-val ${state.isArmed ? 'text-green' : 'text-red'}`);
   setElemText('hud-flight-mode', state.flightMode);
@@ -886,36 +1173,7 @@ function renderTelemetryUI() {
     hIcon.textContent = hazard.severity === 'critical' ? '🔥' : (hazard.severity === 'warning' ? '⚠️' : '🛡️');
   }
 
-  // Diagnostics screen updates
-  setElemText('diag-accel', s && s.mpu_connected ? '0.01g / 0.02g / 0.98g' : '-- / -- / --');
-  setElemText('diag-gyro', s && s.mpu_connected ? '0.12°/s / -0.05°/s / 0.00°/s' : '-- / -- / --');
-  setElemText('diag-mpu-temp', s && s.mpu_temperature_c !== null ? `${s.mpu_temperature_c.toFixed(1)} °C` : '-- °C');
-  setElemText('diag-mpu-ack', s && s.mpu_connected ? '0x00 SUCCESS' : 'BUS ERROR');
-  setElemClass('badge-mpu', s && s.mpu_connected ? 'diag-badge-ok' : 'diag-badge-warn');
-  setElemText('badge-mpu', s && s.mpu_connected ? 'HEALTHY' : 'OFFLINE');
-
-  setElemText('diag-dht-temp', s && s.temperature_c !== null ? `${s.temperature_c} °C` : 'READ ERROR');
-  setElemText('diag-dht-humidity', s && s.humidity_pct !== null ? `${s.humidity_pct} %` : 'READ ERROR');
-  setElemText('diag-dht-valid', s && s.temperature_c !== null ? 'VALID' : 'CRC ERROR');
-  setElemClass('badge-dht', s && s.temperature_c !== null ? 'diag-badge-ok' : 'diag-badge-warn');
-  setElemText('badge-dht', s && s.temperature_c !== null ? 'HEALTHY' : 'OFFLINE');
-
-  setElemText('diag-mq2-raw', s && s.mq2_adc !== null ? `${s.mq2_adc} / 4095` : 'OFFLINE');
-  setElemText('diag-mq2-base', s && s.mq2_adc !== null ? '350' : '--');
-  setElemText('diag-mq2-delta', s && s.mq2_adc !== null ? `+${Math.max(0, s.mq2_adc - 350)} ADC` : '--');
-  setElemClass('badge-mq2', s && s.mq2_adc !== null ? 'diag-badge-ok' : 'diag-badge-warn');
-  setElemText('badge-mq2', s && s.mq2_adc !== null ? 'CALIBRATED' : 'OFFLINE');
-
-  setElemText('diag-flame-pin', s && s.flame_detected !== null ? (s.flame_detected ? 'LOW (TRIGGERED)' : 'HIGH (Inactive)') : 'OFFLINE');
-  setElemText('diag-flame-status', s && s.flame_detected ? 'FLAME DETECTED' : 'NO FLAME DETECTED');
-  setElemClass('badge-flame', s && s.flame_detected !== null ? 'diag-badge-ok' : 'diag-badge-warn');
-  setElemText('badge-flame', s && s.flame_detected !== null ? 'MONITORING' : 'OFFLINE');
-
-  setElemText('diag-gps-sats', g && g.satellites ? `${g.satellites}` : '0');
-  setElemText('diag-gps-age', g && g.valid ? '420 ms' : 'NO FIX');
-  setElemClass('badge-gps', g && g.valid ? 'diag-badge-ok' : 'diag-badge-warn');
-  setElemText('badge-gps', g && g.valid ? '3D FIX' : 'NO FIX');
-
+  syncAlertCenter();
   renderIncidentsTable();
 }
 
@@ -1289,48 +1547,63 @@ function initSimulatedCanvases() {
       }
     }
 
-    // 2. Render Thermal Radiometric Canvas (False-Color Ironbow)
-    if (canvasThermal) {
-      const tCtx = canvasThermal.getContext('2d');
-      const tw = canvasThermal.width;
-      const th = canvasThermal.height;
+    // 2. Render Real-Time Pseudo-Thermal Canvas (Derived from Live ESP32-CAM RGB Video Luminance)
+    const canvasPseudo = document.getElementById('canvas-thermal-pseudo') || canvasThermal;
+    if (canvasPseudo) {
+      const pCtx = canvasPseudo.getContext('2d', { willReadFrequently: true });
+      const pw = canvasPseudo.width;
+      const ph = canvasPseudo.height;
 
-      if (!isLive && !isSim) {
-        drawStandbyHUD(tCtx, tw, th, 'THERMAL PYROMETRY — STANDBY', 'Dual-Band Radiometric IR Sensor Offline', 'Awaiting real temperature observations...');
-      } else {
-        // Base cold ambient gradient
-        const tGrad = tCtx.createRadialGradient(tw / 2, th / 2, 50, tw / 2, th / 2, tw / 2);
-        tGrad.addColorStop(0, '#0a0a2e');
-        tGrad.addColorStop(1, '#020208');
-        tCtx.fillStyle = tGrad;
-        tCtx.fillRect(0, 0, tw, th);
+      const rgbImgEl = document.getElementById('thermal-rgb-img') || document.getElementById('drone-live-stream-img-ai');
+      const isVideoLoaded = rgbImgEl && rgbImgEl.complete && rgbImgEl.naturalWidth > 0 && rgbImgEl.style.display !== 'none';
 
-        // Render thermal hotspot
-        if (state.activeScenario === 'fire_smoke' || state.activeScenario === 'high_heat') {
-          const hx = tw * 0.62;
-          const hy = th * 0.45;
-          const hRadius = state.activeScenario === 'fire_smoke' ? 90 : 50;
+      if (isVideoLoaded) {
+        try {
+          pCtx.drawImage(rgbImgEl, 0, 0, pw, ph);
+          const imgData = pCtx.getImageData(0, 0, pw, ph);
+          const data = imgData.data;
+          const gain = state.thermalGain || 1.0;
+          const palette = state.thermalPalette || 'ironbow';
 
-          const hotspotGrad = tCtx.createRadialGradient(hx, hy, 4, hx, hy, hRadius);
-          hotspotGrad.addColorStop(0, '#ffffff'); // >350°C
-          hotspotGrad.addColorStop(0.2, '#ffff00'); // ~280°C
-          hotspotGrad.addColorStop(0.4, '#ff3b30'); // ~200°C
-          hotspotGrad.addColorStop(0.7, '#9d4edd'); // ~100°C
-          hotspotGrad.addColorStop(1, 'rgba(10, 10, 46, 0)');
+          // Convert each RGB pixel to luminance and map false color
+          for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+            // Standard perceptual optical luminance
+            const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255.0 * gain;
+            const rgb = getThermalColor(lum, palette);
+            data[i] = rgb[0];
+            data[i + 1] = rgb[1];
+            data[i + 2] = rgb[2];
+          }
+          pCtx.putImageData(imgData, 0, 0);
 
-          tCtx.fillStyle = hotspotGrad;
-          tCtx.beginPath();
-          tCtx.arc(hx, hy, hRadius, 0, Math.PI * 2);
-          tCtx.fill();
+          // Render AI Detection bounding boxes & species labels over pseudo-thermal view
+          if (state.lastVisionTelemetry && state.lastVisionTelemetry.detections) {
+            state.lastVisionTelemetry.detections.forEach(det => {
+              if (det.bbox && det.bbox.length === 4) {
+                const [bx1, by1, bx2, by2] = det.bbox;
+                const sx = pw / 640;
+                const sy = ph / 480;
+                pCtx.strokeStyle = det.category === 'Fire' ? '#ef4444' : (det.category === 'Person' ? '#22c55e' : '#00d4ff');
+                pCtx.lineWidth = 2;
+                pCtx.strokeRect(bx1 * sx, by1 * sy, (bx2 - bx1) * sx, (by2 - by1) * sy);
 
-          // Radiometric Spot Meter crosshair
-          tCtx.strokeStyle = '#ffffff';
-          tCtx.lineWidth = 1;
-          tCtx.strokeRect(hx - 20, hy - 20, 40, 40);
-          tCtx.fillStyle = '#ffffff';
-          tCtx.font = 'bold 12px monospace';
-          tCtx.fillText('HOTSPOT: 348.6°C', hx - 40, hy - 28);
+                pCtx.fillStyle = 'rgba(0,0,0,0.75)';
+                pCtx.fillRect(bx1 * sx, Math.max(0, by1 * sy - 20), 130, 18);
+                pCtx.fillStyle = '#ffffff';
+                pCtx.font = 'bold 11px monospace';
+                pCtx.fillText(`${det.class} ${Math.round(det.confidence * 100)}%`, bx1 * sx + 4, Math.max(14, by1 * sy - 6));
+              }
+            });
+          }
+        } catch (e) {
+          // Fallback if cross-origin image blocks getImageData
+          drawStandbyHUD(pCtx, pw, ph, 'PSEUDO-THERMAL HEATMAP ACTIVE', 'Luminance mapping from live ESP32-CAM (TY-OV3660)', 'LUMINANCE: 1.0x GAIN | TEMPERATURE: SENSOR UNAVAILABLE');
         }
+      } else {
+        drawStandbyHUD(pCtx, pw, ph, 'PSEUDO-THERMAL HEATMAP — STANDBY', 'Waiting for live ESP32-CAM stream (http://192.168.4.1/stream)', 'TEMPERATURE: SENSOR UNAVAILABLE (Luminance mapping active)');
       }
     }
 
@@ -1551,6 +1824,40 @@ function initSimulatedCanvases() {
   }
 
   function updateVisionUI(data) {
+    state.lastVisionTelemetry = data;
+    updateWildlifeThreatTable(data.wildlife_assessments, data.model_connected !== false);
+
+    // Hazard notifications from AI detections
+    if (data.wildlife_assessments && data.wildlife_assessments.length > 0) {
+      data.wildlife_assessments.forEach(item => {
+        if (item.threat_category === 'CRITICAL' || item.threat_category === 'HIGH') {
+          addActiveAlert({
+            id: 'ALERT-WILD-' + item.species.toUpperCase(),
+            severity: item.threat_category,
+            source_type: 'AI_VISION',
+            title: `${item.threat_category} Threat: ${item.species} Sighted`,
+            description: `${item.threat_reason}. Recommended: ${item.action}`,
+            timeStr: new Date().toLocaleTimeString(),
+            coords: 'SECTOR ALPHA (CANOPY)',
+            sensor_detail: `YOLOv8 AI: ${item.confidence}%`
+          });
+        }
+      });
+    }
+
+    if (data.fire_alert_active) {
+      addActiveAlert({
+        id: 'ALERT-AI-FIRE',
+        severity: 'CRITICAL',
+        source_type: 'AI_VISION',
+        title: 'YOLO Vision: Active Fire Locked',
+        description: 'Persistent optical combustion signature confirmed by YOLOv8 fine-tuned model.',
+        timeStr: new Date().toLocaleTimeString(),
+        coords: 'SECTOR ALPHA (CANOPY)',
+        sensor_detail: 'YOLOv8 Fine-Tuned Fire Model'
+      });
+    }
+
     const cam = data.camera || {};
     const counts = data.counts || {};
     const cumulative = data.cumulative || {};
@@ -1770,7 +2077,8 @@ function initSimulatedCanvases() {
     isStreamRunning = true;
     const streamUrl = `${visionBackendUrl}/api/camera/stream?annotated=${isOverlayAnnotated}&t=${Date.now()}`;
     
-    [streamImg, streamImgAi].forEach(img => {
+    const thermalRgbImg = document.getElementById('thermal-rgb-img');
+    [streamImg, streamImgAi, thermalRgbImg].forEach(img => {
       if (img) {
         img.src = streamUrl;
         img.style.display = 'block';
@@ -1834,7 +2142,8 @@ function initSimulatedCanvases() {
 
   function stopVisionStream() {
     isStreamRunning = false;
-    [streamImg, streamImgAi].forEach(img => {
+    const thermalRgbImg = document.getElementById('thermal-rgb-img');
+    [streamImg, streamImgAi, thermalRgbImg].forEach(img => {
       if (img) {
         img.src = '';
         img.style.display = 'none';
@@ -2107,6 +2416,188 @@ function initSimulatedCanvases() {
       });
     }
   });
+
+
+  // ========================================================
+  // FIRE GUARDIAN: THERMAL VIEW MODES, PALETTES & SENSOR CONTROLS
+  // ========================================================
+  const btnDual = document.getElementById('btn-thermal-view-dual');
+  const btnPseudo = document.getElementById('btn-thermal-view-pseudo');
+  const btnRgb = document.getElementById('btn-thermal-view-rgb');
+  const thermalContainer = document.getElementById('thermal-display-container');
+  const thermalRgbVp = document.getElementById('thermal-rgb-viewport');
+  const thermalPseudoVp = document.getElementById('thermal-pseudo-viewport');
+
+  if (btnDual && btnPseudo && btnRgb && thermalContainer) {
+    btnDual.addEventListener('click', () => {
+      btnDual.classList.add('active');
+      btnPseudo.classList.remove('active');
+      btnRgb.classList.remove('active');
+      thermalContainer.style.gridTemplateColumns = '1fr 1fr';
+      if (thermalRgbVp) thermalRgbVp.style.display = 'flex';
+      if (thermalPseudoVp) thermalPseudoVp.style.display = 'flex';
+    });
+    btnPseudo.addEventListener('click', () => {
+      btnPseudo.classList.add('active');
+      btnDual.classList.remove('active');
+      btnRgb.classList.remove('active');
+      thermalContainer.style.gridTemplateColumns = '1fr';
+      if (thermalRgbVp) thermalRgbVp.style.display = 'none';
+      if (thermalPseudoVp) thermalPseudoVp.style.display = 'flex';
+    });
+    btnRgb.addEventListener('click', () => {
+      btnRgb.classList.add('active');
+      btnDual.classList.remove('active');
+      btnPseudo.classList.remove('active');
+      thermalContainer.style.gridTemplateColumns = '1fr';
+      if (thermalRgbVp) thermalRgbVp.style.display = 'flex';
+      if (thermalPseudoVp) thermalPseudoVp.style.display = 'none';
+    });
+  }
+
+  const selThermalPalette = document.getElementById('select-thermal-palette');
+  const paletteTag = document.getElementById('thermal-palette-name-tag');
+  const legendGrad = document.getElementById('thermal-legend-gradient');
+
+  if (selThermalPalette) {
+    selThermalPalette.addEventListener('change', (e) => {
+      state.thermalPalette = e.target.value;
+      if (paletteTag) paletteTag.textContent = e.target.value.toUpperCase();
+      if (legendGrad) {
+        if (state.thermalPalette === 'inferno') {
+          legendGrad.style.background = 'linear-gradient(90deg, #000000 0%, #3b0764 25%, #991b1b 50%, #f97316 75%, #fef08a 100%)';
+        } else if (state.thermalPalette === 'rainbow') {
+          legendGrad.style.background = 'linear-gradient(90deg, #0000ff 0%, #06b6d4 25%, #22c55e 50%, #eab308 75%, #ef4444 100%)';
+        } else if (state.thermalPalette === 'whitehot') {
+          legendGrad.style.background = 'linear-gradient(90deg, #000000 0%, #555555 35%, #aaaaaa 70%, #ffffff 100%)';
+        } else {
+          legendGrad.style.background = 'linear-gradient(90deg, #05051a 0%, #1e1b4b 20%, #4338ca 40%, #e11d48 65%, #f59e0b 85%, #ffffff 100%)';
+        }
+      }
+    });
+  }
+
+  const sliderThresh = document.getElementById('slider-temp-thresh');
+  const valThresh = document.getElementById('val-temp-threshold');
+  if (sliderThresh && valThresh) {
+    sliderThresh.addEventListener('input', (e) => {
+      state.thermalHotspotThreshold = parseInt(e.target.value) / 100;
+      valThresh.textContent = `${e.target.value}% Peak`;
+    });
+  }
+
+  const sliderGain = document.getElementById('slider-thermal-gain');
+  const valGain = document.getElementById('val-thermal-gain');
+  if (sliderGain && valGain) {
+    sliderGain.addEventListener('input', (e) => {
+      state.thermalGain = parseInt(e.target.value) / 100;
+      valGain.textContent = `${state.thermalGain.toFixed(1)}x Gain`;
+    });
+  }
+
+  const sliderWarn = document.getElementById('slider-smoke-warn');
+  const sliderCrit = document.getElementById('slider-smoke-crit');
+  const valWarn = document.getElementById('val-smoke-warn-thresh');
+  const valCrit = document.getElementById('val-smoke-crit-thresh');
+
+  if (sliderWarn && valWarn) {
+    sliderWarn.addEventListener('input', (e) => {
+      state.smokeWarnThreshold = parseInt(e.target.value);
+      valWarn.textContent = state.smokeWarnThreshold;
+      renderTelemetryUI();
+    });
+  }
+  if (sliderCrit && valCrit) {
+    sliderCrit.addEventListener('input', (e) => {
+      state.smokeCritThreshold = parseInt(e.target.value);
+      valCrit.textContent = state.smokeCritThreshold;
+      renderTelemetryUI();
+    });
+  }
+
+  const btnToggleBrowserAudio = document.getElementById('btn-toggle-browser-audio');
+  const audioAlertIcon = document.getElementById('audio-alert-icon');
+  const audioAlertText = document.getElementById('audio-alert-text');
+
+  if (btnToggleBrowserAudio) {
+    btnToggleBrowserAudio.addEventListener('click', () => {
+      state.browserAudioAlertsEnabled = !state.browserAudioAlertsEnabled;
+      if (audioAlertText) audioAlertText.textContent = `Browser Audio: ${state.browserAudioAlertsEnabled ? 'ON' : 'OFF'}`;
+      if (audioAlertIcon) audioAlertIcon.textContent = state.browserAudioAlertsEnabled ? '🔔' : '🔕';
+      logEvent('SYSTEM', `Browser Web Audio alerts: ${state.browserAudioAlertsEnabled ? 'ENABLED' : 'MUTED'}`);
+    });
+  }
+
+  const btnAckAll = document.getElementById('btn-ack-all-alerts');
+  if (btnAckAll) {
+    btnAckAll.addEventListener('click', () => {
+      state.activeAlerts = [];
+      syncAlertCenter();
+      updateAlertCounter();
+      logEvent('ALERT', 'All active alerts acknowledged.');
+    });
+  }
+
+  const btnClearHistory = document.getElementById('btn-clear-incident-history');
+  if (btnClearHistory) {
+    btnClearHistory.addEventListener('click', () => {
+      state.incidents = [];
+      renderIncidentsTable();
+      logEvent('SYSTEM', 'Incident audit log cleared.');
+    });
+  }
+
+  const btnTriggerHwBuzzer = document.getElementById('btn-trigger-hardware-buzzer');
+  if (btnTriggerHwBuzzer) {
+    btnTriggerHwBuzzer.addEventListener('click', () => {
+      state.telemetry.sensors.buzzer_active = true;
+      renderTelemetryUI();
+      playBuzzer(true);
+      logEvent('ALERT', 'ESP32 Hardware Siren manually triggered by pilot.');
+      setTimeout(() => {
+        state.telemetry.sensors.buzzer_active = false;
+        renderTelemetryUI();
+      }, 3000);
+    });
+  }
+
+  const btnSyncSensors = document.getElementById('btn-sync-sensors');
+  if (btnSyncSensors) {
+    btnSyncSensors.addEventListener('click', () => {
+      renderTelemetryUI();
+      logEvent('SYSTEM', 'Telemetry sync requested.');
+    });
+  }
+
+  const btnReconnectStreamAi = document.getElementById('btn-reconnect-stream-ai');
+  if (btnReconnectStreamAi) {
+    btnReconnectStreamAi.addEventListener('click', () => {
+      stopVisionStream();
+      setTimeout(() => startVisionStream(), 200);
+    });
+  }
+
+  const btnRetryDirect = document.getElementById('btn-retry-stream-direct');
+  if (btnRetryDirect) {
+    btnRetryDirect.addEventListener('click', () => {
+      const inputUrl = document.getElementById('input-esp32-url-ai');
+      const url = (inputUrl && inputUrl.value) ? inputUrl.value.trim() : 'http://192.168.4.1/stream';
+      state.cameraStreamUrl = url;
+      startVisionStream(url);
+    });
+  }
+
+  const btnApplyUrl = document.getElementById('btn-apply-esp32-url-ai');
+  if (btnApplyUrl) {
+    btnApplyUrl.addEventListener('click', () => {
+      const inputUrl = document.getElementById('input-esp32-url-ai');
+      if (inputUrl && inputUrl.value) {
+        state.cameraStreamUrl = inputUrl.value.trim();
+        startVisionStream(state.cameraStreamUrl);
+        logEvent('SYSTEM', `Camera stream URL applied: ${state.cameraStreamUrl}`);
+      }
+    });
+  }
 
   // Auto-connect to local vision service if available on page load
   setTimeout(() => {
