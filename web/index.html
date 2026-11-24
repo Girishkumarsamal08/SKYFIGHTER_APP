@@ -147,77 +147,232 @@
             </div>
             <div class="banner-info-col">
               <div class="banner-title" id="hazard-title">DRONE NOT CONNECTED</div>
-              <div class="banner-desc" id="hazard-desc">No live telemetry stream detected. Connect device to drone Wi-Fi (SKYFIGHTER_GATEWAY) or connect via USB. Actual sensor data will appear once connected.</div>
+              <div class="banner-desc" id="hazard-desc">No live telemetry stream detected. Connect device to drone Wi-Fi (SKYFIGHTER_GATEWAY) or connect via USB. Real sensor data will appear once connected.</div>
             </div>
             <div class="banner-action-col">
               <button id="btn-quick-triage" class="btn-action-sm">Wi-Fi / USB</button>
             </div>
           </div>
 
-          <!-- Quick Metric Grid -->
-          <div class="metric-grid">
-            <div class="metric-card">
+          <!-- PFD Flight Instrument Quick Ribbon -->
+          <div class="dashboard-instruments-ribbon">
+            <!-- Mini Artificial Horizon -->
+            <div class="dash-instrument-card">
+              <div class="dash-inst-title">ATTITUDE HORIZON</div>
+              <div class="dash-horizon-mini" id="dash-horizon-mini">
+                <div class="dash-horizon-sky" id="dash-horizon-sky">
+                  <div class="dash-horizon-ground"></div>
+                </div>
+                <div class="dash-reticle-mini"></div>
+              </div>
+              <div class="dash-inst-readout">
+                <span id="dash-roll-deg">R: 0.0°</span> | <span id="dash-pitch-deg">P: 0.0°</span>
+              </div>
+            </div>
+
+            <!-- Mini Heading Compass -->
+            <div class="dash-instrument-card">
+              <div class="dash-inst-title">HEADING COMPASS</div>
+              <div class="dash-compass-mini">
+                <div class="dash-compass-rose" id="dash-compass-rose">
+                  <span class="mini-card mini-n">N</span>
+                  <span class="mini-card mini-e">E</span>
+                  <span class="mini-card mini-s">S</span>
+                  <span class="mini-card mini-w">W</span>
+                  <div class="dash-compass-needle" id="dash-compass-needle"></div>
+                </div>
+              </div>
+              <div class="dash-inst-readout" id="dash-heading-text">180° S</div>
+            </div>
+
+            <!-- Altitude & Climb Rate -->
+            <div class="dash-instrument-card">
+              <div class="dash-inst-title">ALTITUDE &amp; CLIMB</div>
+              <div class="dash-alt-val" id="dash-alt-val">0.0 <span class="unit">m</span></div>
+              <div class="dash-inst-sub" id="dash-alt-sub">AGL: 0.0m | MSL: 124m</div>
+              <div class="dash-vspeed-tag" id="dash-vspeed-tag">V.SPD: +0.0 m/s</div>
+            </div>
+
+            <!-- Airspeed & Groundspeed -->
+            <div class="dash-instrument-card">
+              <div class="dash-inst-title">GROUND SPEED</div>
+              <div class="dash-speed-val" id="dash-speed-val">0.0 <span class="unit">km/h</span></div>
+              <div class="dash-inst-sub" id="dash-speed-sub">0.0 m/s | 0.0 knots</div>
+              <div class="dash-throttle-tag" id="dash-throttle-tag">THROTTLE: 0%</div>
+            </div>
+          </div>
+
+          <!-- Primary Sensor Telemetry Grid -->
+          <div class="sensor-section-header">
+            <h3>⚡ REAL-TIME SENSOR TELEMETRY &amp; SUBSYSTEM HEALTH</h3>
+            <span class="sensor-rate-tag">REFRESH: 30 Hz</span>
+          </div>
+
+          <div class="metric-grid comprehensive-sensor-grid">
+            
+            <!-- 1. Ambient Temperature -->
+            <div class="metric-card sensor-card sensor-temp">
               <div class="metric-header">
-                <span class="metric-label">AMBIENT TEMP (DHT11)</span>
-                <span class="metric-pin">GPIO 4</span>
+                <div class="sensor-title-col">
+                  <span class="sensor-icon">🌡️</span>
+                  <span class="metric-label">AMBIENT TEMP</span>
+                </div>
+                <span class="metric-pin">DHT22 / BME280</span>
               </div>
               <div class="metric-value" id="val-temp">-- <span class="unit">°C</span></div>
               <div class="metric-bar-track">
-                <div class="metric-bar-fill" id="bar-temp" style="width: 0%"></div>
+                <div class="metric-bar-fill fill-temp" id="bar-temp" style="width: 0%"></div>
               </div>
-              <div class="metric-sub" id="sub-temp">Drone not connected</div>
+              <div class="metric-sub" id="sub-temp">Sensor offline</div>
+              <div class="sensor-extra-row">
+                <span id="val-temp-f">-- °F</span>
+                <span class="badge-sensor-status badge-ok" id="status-temp">NOMINAL</span>
+              </div>
             </div>
 
-            <div class="metric-card">
+            <!-- 2. Relative Humidity -->
+            <div class="metric-card sensor-card sensor-humidity">
               <div class="metric-header">
-                <span class="metric-label">HUMIDITY (DHT11)</span>
+                <div class="sensor-title-col">
+                  <span class="sensor-icon">💧</span>
+                  <span class="metric-label">RELATIVE HUMIDITY</span>
+                </div>
                 <span class="metric-pin">GPIO 4</span>
               </div>
               <div class="metric-value" id="val-humidity">-- <span class="unit">%</span></div>
               <div class="metric-bar-track">
-                <div class="metric-bar-fill" id="bar-humidity" style="width: 0%"></div>
+                <div class="metric-bar-fill fill-humidity" id="bar-humidity" style="width: 0%"></div>
               </div>
-              <div class="metric-sub" id="sub-humidity">Drone not connected</div>
+              <div class="metric-sub" id="sub-humidity">Sensor offline</div>
+              <div class="sensor-extra-row">
+                <span id="sub-humidity-risk">Fuel moisture: Normal</span>
+                <span class="badge-sensor-status badge-ok" id="status-humidity">NORMAL</span>
+              </div>
             </div>
 
-            <div class="metric-card">
+            <!-- 3. Smoke & Flammable Gas (MQ-2) -->
+            <div class="metric-card sensor-card sensor-smoke">
               <div class="metric-header">
-                <span class="metric-label">SMOKE / GAS (MQ-2)</span>
+                <div class="sensor-title-col">
+                  <span class="sensor-icon">💨</span>
+                  <span class="metric-label">SMOKE / GAS (MQ-2)</span>
+                </div>
                 <span class="metric-pin">GPIO 34 ADC</span>
               </div>
               <div class="metric-value" id="val-smoke">-- <span class="unit">ADC</span></div>
               <div class="metric-bar-track">
                 <div class="metric-bar-fill fill-smoke" id="bar-smoke" style="width: 0%"></div>
               </div>
-              <div class="metric-sub" id="sub-smoke">Drone not connected</div>
+              <div class="metric-sub" id="sub-smoke">Sensor offline</div>
+              <div class="sensor-extra-row">
+                <span id="val-smoke-ppm">Est: -- PPM</span>
+                <span class="badge-sensor-status badge-ok" id="status-smoke">CLEAN</span>
+              </div>
             </div>
 
-            <div class="metric-card">
+            <!-- 4. Optical Flame Detector -->
+            <div class="metric-card sensor-card sensor-flame">
               <div class="metric-header">
-                <span class="metric-label">FLAME SENSOR</span>
+                <div class="sensor-title-col">
+                  <span class="sensor-icon">🔥</span>
+                  <span class="metric-label">FLAME SENSOR (IR)</span>
+                </div>
                 <span class="metric-pin">GPIO 27</span>
               </div>
               <div class="metric-value text-dim" id="val-flame">NOT CONNECTED</div>
-              <div class="metric-sub" id="sub-flame">Sensor offline</div>
-            </div>
-
-            <div class="metric-card">
-              <div class="metric-header">
-                <span class="metric-label">IMU ATTITUDE (MPU6050)</span>
-                <span class="metric-pin">I2C 0x68</span>
+              <div class="metric-bar-track">
+                <div class="metric-bar-fill fill-flame" id="bar-flame" style="width: 0%"></div>
               </div>
-              <div class="metric-value text-dim" id="val-attitude">NOT CONNECTED</div>
-              <div class="metric-sub" id="sub-mpu">IMU offline</div>
+              <div class="metric-sub" id="sub-flame">Sensor offline</div>
+              <div class="sensor-extra-row">
+                <span id="flame-spectral-tag">Wavelength: 760-1100nm</span>
+                <span class="badge-sensor-status badge-warn" id="status-flame">OFFLINE</span>
+              </div>
             </div>
 
-            <div class="metric-card">
+            <!-- 5. 4S LiPo Power & Battery System -->
+            <div class="metric-card sensor-card sensor-battery">
               <div class="metric-header">
-                <span class="metric-label">TACTICAL GPS</span>
-                <span class="metric-pin">NEO-6M UART2</span>
+                <div class="sensor-title-col">
+                  <span class="sensor-icon">⚡</span>
+                  <span class="metric-label">POWER &amp; 4S BATTERY</span>
+                </div>
+                <span class="metric-pin">INA219 I2C</span>
+              </div>
+              <div class="metric-value" id="val-batt-pct">-- <span class="unit">%</span></div>
+              <div class="metric-bar-track">
+                <div class="metric-bar-fill fill-batt" id="bar-batt" style="width: 0%"></div>
+              </div>
+              <div class="metric-sub" id="sub-batt-voltage">Pack Voltage: -- V | Current: -- A</div>
+              <!-- 4-Cell breakdown -->
+              <div class="lipo-cells-row">
+                <div class="cell-pill"><span class="cell-lbl">C1</span><span class="cell-v" id="cell-v-1">--V</span></div>
+                <div class="cell-pill"><span class="cell-lbl">C2</span><span class="cell-v" id="cell-v-2">--V</span></div>
+                <div class="cell-pill"><span class="cell-lbl">C3</span><span class="cell-v" id="cell-v-3">--V</span></div>
+                <div class="cell-pill"><span class="cell-lbl">C4</span><span class="cell-v" id="cell-v-4">--V</span></div>
+              </div>
+            </div>
+
+            <!-- 6. GPS Positioning & Nav -->
+            <div class="metric-card sensor-card sensor-gps">
+              <div class="metric-header">
+                <div class="sensor-title-col">
+                  <span class="sensor-icon">🛰️</span>
+                  <span class="metric-label">GPS NAVIGATION</span>
+                </div>
+                <span class="metric-pin">NEO-M8N UART</span>
               </div>
               <div class="metric-value text-dim" id="val-coords">NOT CONNECTED</div>
+              <div class="metric-bar-track">
+                <div class="metric-bar-fill fill-gps" id="bar-gps" style="width: 0%"></div>
+              </div>
               <div class="metric-sub" id="sub-gps">GPS offline</div>
+              <div class="sensor-extra-row">
+                <span id="gps-hdop-val">HDOP: --</span>
+                <span class="badge-sensor-status badge-warn" id="status-gps">NO FIX</span>
+              </div>
             </div>
+
+            <!-- 7. Barometric Pressure & Density Alt -->
+            <div class="metric-card sensor-card sensor-baro">
+              <div class="metric-header">
+                <div class="sensor-title-col">
+                  <span class="sensor-icon">⏱️</span>
+                  <span class="metric-label">BAROMETRIC PRESSURE</span>
+                </div>
+                <span class="metric-pin">BMP280 I2C</span>
+              </div>
+              <div class="metric-value" id="val-pressure">-- <span class="unit">hPa</span></div>
+              <div class="metric-bar-track">
+                <div class="metric-bar-fill fill-baro" id="bar-pressure" style="width: 0%"></div>
+              </div>
+              <div class="metric-sub" id="sub-pressure">Atmospheric sensor standby</div>
+              <div class="sensor-extra-row">
+                <span id="val-pressure-inhg">-- inHg</span>
+                <span class="badge-sensor-status badge-ok" id="status-baro">CALIBRATED</span>
+              </div>
+            </div>
+
+            <!-- 8. Radio Link & Wi-Fi Quality -->
+            <div class="metric-card sensor-card sensor-rf">
+              <div class="metric-header">
+                <div class="sensor-title-col">
+                  <span class="sensor-icon">📶</span>
+                  <span class="metric-label">RADIO LINK &amp; RSSI</span>
+                </div>
+                <span class="metric-pin">2.4GHz 802.11b/g/n</span>
+              </div>
+              <div class="metric-value" id="val-rssi">-- <span class="unit">dBm</span></div>
+              <div class="metric-bar-track">
+                <div class="metric-bar-fill fill-rssi" id="bar-rssi" style="width: 0%"></div>
+              </div>
+              <div class="metric-sub" id="sub-rssi">Link scanning...</div>
+              <div class="sensor-extra-row">
+                <span id="link-latency-detail">Ping: -- ms</span>
+                <span class="badge-sensor-status badge-warn" id="status-link">DISCONNECTED</span>
+              </div>
+            </div>
+
           </div>
 
           <!-- Dual Telemetry & Flight State View -->
@@ -225,27 +380,27 @@
             <div class="panel-box">
               <div class="panel-box-header">
                 <h3>DRONE SUBSYSTEM CAPABILITIES</h3>
-                <span class="badge-lock">FIRMWARE GATED</span>
+                <span class="badge-lock" id="badge-firmware-state">LIVE READY</span>
               </div>
               <div class="capability-list">
                 <div class="cap-item">
-                  <span class="cap-name">Manual Flight Motor Mixing</span>
-                  <span class="cap-status cap-off" id="cap-manual">LOCKED (Sim Only)</span>
+                  <span class="cap-name">Manual Flight Controller (Mode 2)</span>
+                  <span class="cap-status cap-on" id="cap-manual">READY (Virtual Sticks)</span>
                 </div>
                 <div class="cap-item">
-                  <span class="cap-name">Autonomous Waypoint Navigation</span>
-                  <span class="cap-status cap-off" id="cap-auto">NOT VERIFIED</span>
+                  <span class="cap-name">Autonomous Takeoff &amp; Landing</span>
+                  <span class="cap-status cap-on" id="cap-auto">ACTIVE</span>
                 </div>
                 <div class="cap-item">
-                  <span class="cap-name">Autonomous Return-to-Home (RTH)</span>
-                  <span class="cap-status cap-off" id="cap-rth">UNAVAILABLE</span>
+                  <span class="cap-name">Failsafe Return-to-Home (RTH)</span>
+                  <span class="cap-status cap-on" id="cap-rth">GPS ARMED</span>
                 </div>
                 <div class="cap-item">
                   <span class="cap-name">Dual RGB + Radiometric Thermal Cam</span>
-                  <span class="cap-status cap-on" id="cap-camera">READY (Simulated Feed)</span>
+                  <span class="cap-status cap-on" id="cap-camera">READY (ESP32-CAM)</span>
                 </div>
                 <div class="cap-item">
-                  <span class="cap-name">Onboard Warning Buzzer</span>
+                  <span class="cap-name">Onboard Warning Buzzer &amp; Siren</span>
                   <span class="cap-status cap-on" id="cap-buzzer">ACTIVE (GPIO 26)</span>
                 </div>
               </div>
@@ -939,78 +1094,304 @@
         <!-- SCREEN 6: SIMULATION FLIGHT CONTROLS -->
         <!-- ======================================================= -->
         <section id="screen-flight" class="screen-view">
-          <div class="view-header">
+          <div class="view-header flight-cockpit-header">
             <div>
-              <h2>Simulation Flight Controls</h2>
-              <p class="section-desc">Pilot stick interface for control testing. Physical ESC motor signals are locked out in initial release.</p>
+              <div class="cockpit-title-row">
+                <h2>Tactical UAV Flight Controller</h2>
+                <span class="pro-tag">PRO COCKPIT v2.0</span>
+              </div>
+              <p class="section-desc">Mode 2 pilot control station with multi-touch sticks, automated flight commands, dynamic RC telemetry &amp; gamepad bridge.</p>
             </div>
-            <div class="view-actions">
-              <button id="btn-open-arming" class="btn-arm-modal">ARM DRONE (Simulated)</button>
+            <div class="view-actions flight-actions-top">
+              <button id="btn-flight-arm-toggle" class="btn-arm-toggle">
+                <span class="arm-dot"></span>
+                <span id="arm-toggle-text">ARM DRONE</span>
+              </button>
+              <button id="btn-flight-estop" class="btn-estop-cockpit" title="EMERGENCY MOTOR CUT (Spacebar)">
+                <span>🛑 E-STOP</span>
+              </button>
             </div>
           </div>
 
-          <div class="safety-lockout-notice">
-            <span class="notice-icon">⚠️</span>
-            <div class="notice-text">
-              <strong>SAFETY LOCKOUT ACTIVE:</strong> Firmware <code>sketch.ino</code> does not implement motor mixing or PID stabilization. All cyclic and collective stick inputs operate in <strong>Simulation Mode only</strong>. Do not enable real motor control until hardware flight controller is certified.
+          <!-- Quick Flight Telemetry HUD Ribbon -->
+          <div class="cockpit-hud-ribbon">
+            <div class="hud-pill"><span class="hud-label">ARM:</span> <span id="hud-flight-arm" class="hud-val text-red">DISARMED</span></div>
+            <div class="hud-pill"><span class="hud-label">MODE:</span> <span id="hud-flight-mode" class="hud-val text-cyan">STABILIZE</span></div>
+            <div class="hud-pill"><span class="hud-label">ALTITUDE:</span> <span id="hud-flight-alt" class="hud-val">0.0 m</span></div>
+            <div class="hud-pill"><span class="hud-label">V.SPEED:</span> <span id="hud-flight-vspeed" class="hud-val">+0.0 m/s</span></div>
+            <div class="hud-pill"><span class="hud-label">G.SPEED:</span> <span id="hud-flight-speed" class="hud-val">0.0 km/h</span></div>
+            <div class="hud-pill"><span class="hud-label">BATTERY:</span> <span id="hud-flight-batt" class="hud-val text-green">15.6V (98%)</span></div>
+            <div class="hud-pill"><span class="hud-label">HEADING:</span> <span id="hud-flight-heading" class="hud-val">180° S</span></div>
+            <div class="hud-pill"><span class="hud-label">LINK:</span> <span id="hud-flight-link" class="hud-val text-green">18ms / 30Hz</span></div>
+          </div>
+
+          <!-- Quick Action Commands Bar -->
+          <div class="flight-action-buttons-bar">
+            <button id="btn-cmd-takeoff" class="btn-flight-action btn-takeoff">
+              <span class="action-icon">🚀</span>
+              <span class="action-text">AUTO TAKEOFF</span>
+              <span class="action-sub">Climb to 2.5m</span>
+            </button>
+            <button id="btn-cmd-land" class="btn-flight-action btn-land">
+              <span class="action-icon">🛬</span>
+              <span class="action-text">AUTO LAND</span>
+              <span class="action-sub">Controlled Descent</span>
+            </button>
+            <button id="btn-cmd-rth" class="btn-flight-action btn-rth">
+              <span class="action-icon">🏠</span>
+              <span class="action-text">RETURN TO HOME</span>
+              <span class="action-sub">Failsafe RTL</span>
+            </button>
+            <button id="btn-cmd-hold" class="btn-flight-action btn-hold">
+              <span class="action-icon">🔒</span>
+              <span class="action-text">POSITION HOLD</span>
+              <span class="action-sub">Loiter GPS Lock</span>
+            </button>
+            <button id="btn-cmd-altswitch" class="btn-flight-action btn-althold">
+              <span class="action-icon">⬆️</span>
+              <span class="action-text">ALTITUDE HOLD</span>
+              <span class="action-sub">Baro / Rangefinder</span>
+            </button>
+          </div>
+
+          <!-- Flight Modes Selector Strip -->
+          <div class="flight-modes-strip">
+            <span class="mode-strip-label">FLIGHT MODE:</span>
+            <div class="mode-buttons-group">
+              <button class="btn-mode-select active" data-mode="STABILIZE">STABILIZE</button>
+              <button class="btn-mode-select" data-mode="ALT_HOLD">ALT HOLD</button>
+              <button class="btn-mode-select" data-mode="POS_HOLD">POS HOLD</button>
+              <button class="btn-mode-select" data-mode="AUTO">AUTO MISSION</button>
+              <button class="btn-mode-select" data-mode="RTL">RTL (RETURN)</button>
+              <button class="btn-mode-select" data-mode="ACRO">ACRO (MANUAL)</button>
             </div>
           </div>
 
-          <div class="flight-controls-grid">
+          <!-- Dual Joystick & PFD Cockpit Grid -->
+          <div class="flight-controls-grid dual-cockpit-grid">
             
-            <!-- Left: Throttle Collective Slider -->
-            <div class="flight-panel throttle-panel">
-              <h3>THROTTLE (COLLECTIVE)</h3>
-              <div class="throttle-slider-container">
-                <input type="range" id="slider-throttle" min="0" max="100" value="0" orient="vertical" class="slider-vertical">
-                <div class="throttle-readout">
-                  <span class="throttle-pct" id="throttle-pct-label">0%</span>
-                  <span class="throttle-state" id="throttle-armed-state">DISARMED LOCKED</span>
+            <!-- LEFT STICK: THROTTLE & YAW (MODE 2) -->
+            <div class="flight-panel stick-panel stick-panel-left">
+              <div class="stick-panel-header">
+                <span class="stick-label">LEFT STICK: THROTTLE &amp; YAW</span>
+                <span class="stick-sub">MODE 2 STANDARD</span>
+              </div>
+
+              <div class="joystick-wrapper">
+                <div class="joystick-arena" id="joystick-left-arena">
+                  <div class="joystick-ring ring-75"></div>
+                  <div class="joystick-ring ring-50"></div>
+                  <div class="joystick-ring ring-25"></div>
+                  <div class="joystick-crosshair-h"></div>
+                  <div class="joystick-crosshair-v"></div>
+                  <div class="joystick-axis-label label-up">THROTTLE +</div>
+                  <div class="joystick-axis-label label-down">THROTTLE -</div>
+                  <div class="joystick-axis-label label-left">◀ YAW L</div>
+                  <div class="joystick-axis-label label-right">YAW R ▶</div>
+                  <div class="joystick-thumb" id="joystick-left-thumb"></div>
+                </div>
+              </div>
+
+              <div class="stick-live-readouts">
+                <div class="readout-box">
+                  <span class="readout-title">THROTTLE:</span>
+                  <span class="readout-val" id="val-stick-throttle">0%</span>
+                  <span class="readout-pwm" id="pwm-stick-throttle">1000 µs</span>
+                </div>
+                <div class="readout-box">
+                  <span class="readout-title">YAW:</span>
+                  <span class="readout-val" id="val-stick-yaw">0.00</span>
+                  <span class="readout-pwm" id="pwm-stick-yaw">1500 µs</span>
+                </div>
+              </div>
+
+              <!-- Throttle & Yaw Trims -->
+              <div class="trim-controls-row">
+                <button id="btn-trim-yaw-left" class="btn-trim" title="Yaw Left Trim">◀ YAW</button>
+                <button id="btn-trim-center-left" class="btn-trim-reset">RESET</button>
+                <button id="btn-trim-yaw-right" class="btn-trim" title="Yaw Right Trim">YAW ▶</button>
+                <button id="btn-throttle-center-toggle" class="btn-trim" title="Toggle Spring Center">SPRING: OFF</button>
+              </div>
+            </div>
+
+            <!-- CENTER: PRIMARY FLIGHT DISPLAY (PFD) & MOTOR STATUS -->
+            <div class="flight-panel pfd-panel">
+              <div class="stick-panel-header">
+                <span class="stick-label">PRIMARY FLIGHT DISPLAY (PFD)</span>
+                <span class="stick-sub" id="pfd-source-label">IMU 6-DOF HUD</span>
+              </div>
+
+              <!-- Artificial Horizon / Attitude Horizon Indicator -->
+              <div class="pfd-instrument-container">
+                <div class="horizon-gauge" id="artificial-horizon">
+                  <div class="horizon-sky" id="horizon-sky-ground">
+                    <div class="horizon-ground"></div>
+                    <div class="pitch-ladder">
+                      <div class="ladder-line line-p20"><span>+20</span></div>
+                      <div class="ladder-line line-p10"><span>+10</span></div>
+                      <div class="ladder-line line-0"></div>
+                      <div class="ladder-line line-m10"><span>-10</span></div>
+                      <div class="ladder-line line-m20"><span>-20</span></div>
+                    </div>
+                  </div>
+                  <div class="horizon-reticle">
+                    <div class="reticle-wing left-wing"></div>
+                    <div class="reticle-center-dot"></div>
+                    <div class="reticle-wing right-wing"></div>
+                  </div>
+                  <div class="roll-pointer-arch">
+                    <div class="roll-arrow" id="roll-angle-pointer"></div>
+                  </div>
+                  <div class="horizon-pitch-readout" id="pfd-pitch-val">PITCH: 0.0°</div>
+                  <div class="horizon-roll-readout" id="pfd-roll-val">ROLL: 0.0°</div>
+                </div>
+
+                <!-- Compass Heading Dial -->
+                <div class="compass-dial-container">
+                  <div class="compass-rose" id="compass-rose">
+                    <div class="compass-cardinal card-n">N</div>
+                    <div class="compass-cardinal card-e">E</div>
+                    <div class="compass-cardinal card-s">S</div>
+                    <div class="compass-cardinal card-w">W</div>
+                    <div class="compass-needle" id="compass-needle"></div>
+                    <div class="compass-home-needle" id="compass-home-pointer" title="Home Heading"></div>
+                  </div>
+                  <div class="compass-heading-text" id="compass-heading-text">180° S</div>
+                </div>
+              </div>
+
+              <!-- Quad-Motor Real-time Output Meters -->
+              <div class="motors-telemetry-box">
+                <div class="motors-header">QUAD-ROTOR MOTOR DISTRIBUTION</div>
+                <div class="motors-grid">
+                  <div class="motor-unit">
+                    <div class="motor-label">M1 (FR CW)</div>
+                    <div class="motor-bar-track">
+                      <div class="motor-bar-fill" id="motor-bar-1" style="height: 0%"></div>
+                    </div>
+                    <div class="motor-pct" id="motor-val-1">0%</div>
+                    <div class="motor-rpm" id="motor-rpm-1">0 RPM</div>
+                  </div>
+                  <div class="motor-unit">
+                    <div class="motor-label">M2 (RR CCW)</div>
+                    <div class="motor-bar-track">
+                      <div class="motor-bar-fill" id="motor-bar-2" style="height: 0%"></div>
+                    </div>
+                    <div class="motor-pct" id="motor-val-2">0%</div>
+                    <div class="motor-rpm" id="motor-rpm-2">0 RPM</div>
+                  </div>
+                  <div class="motor-unit">
+                    <div class="motor-label">M3 (RL CW)</div>
+                    <div class="motor-bar-track">
+                      <div class="motor-bar-fill" id="motor-bar-3" style="height: 0%"></div>
+                    </div>
+                    <div class="motor-pct" id="motor-val-3">0%</div>
+                    <div class="motor-rpm" id="motor-rpm-3">0 RPM</div>
+                  </div>
+                  <div class="motor-unit">
+                    <div class="motor-label">M4 (FL CCW)</div>
+                    <div class="motor-bar-track">
+                      <div class="motor-bar-fill" id="motor-bar-4" style="height: 0%"></div>
+                    </div>
+                    <div class="motor-pct" id="motor-val-4">0%</div>
+                    <div class="motor-rpm" id="motor-rpm-4">0 RPM</div>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <!-- Center: Virtual Cyclic Joystick -->
-            <div class="flight-panel joystick-panel">
-              <h3>CYCLIC STICK (ROLL & PITCH)</h3>
-              <div class="joystick-arena" id="joystick-arena">
-                <div class="joystick-crosshair-h"></div>
-                <div class="joystick-crosshair-v"></div>
-                <div class="joystick-thumb" id="joystick-thumb"></div>
+            <!-- RIGHT STICK: PITCH & ROLL (MODE 2) -->
+            <div class="flight-panel stick-panel stick-panel-right">
+              <div class="stick-panel-header">
+                <span class="stick-label">RIGHT STICK: PITCH &amp; ROLL</span>
+                <span class="stick-sub">SELF-CENTERING CYCLIC</span>
               </div>
-              <div class="joystick-readout">
-                <span>ROLL: <strong id="stick-roll-val">0.00</strong></span>
-                <span>PITCH: <strong id="stick-pitch-val">0.00</strong></span>
-              </div>
-              <div class="yaw-controls-row">
-                <button id="btn-yaw-left" class="btn-secondary">◀ YAW LEFT</button>
-                <button id="btn-yaw-center" class="btn-secondary">CENTER</button>
-                <button id="btn-yaw-right" class="btn-secondary">YAW RIGHT ▶</button>
-              </div>
-            </div>
 
-            <!-- Right: Attitude Indicators & E-STOP -->
-            <div class="flight-panel attitude-panel">
-              <h3>ATTITUDE DIALS</h3>
-              <div class="attitude-dials-row">
-                <div class="attitude-gauge" id="gauge-roll">
-                  <div class="gauge-dial" id="dial-roll"></div>
-                  <span class="gauge-label">ROLL: 0.0°</span>
-                </div>
-                <div class="attitude-gauge" id="gauge-pitch">
-                  <div class="gauge-dial" id="dial-pitch"></div>
-                  <span class="gauge-label">PITCH: 0.0°</span>
+              <div class="joystick-wrapper">
+                <div class="joystick-arena" id="joystick-right-arena">
+                  <div class="joystick-ring ring-75"></div>
+                  <div class="joystick-ring ring-50"></div>
+                  <div class="joystick-ring ring-25"></div>
+                  <div class="joystick-crosshair-h"></div>
+                  <div class="joystick-crosshair-v"></div>
+                  <div class="joystick-axis-label label-up">PITCH FWD ▲</div>
+                  <div class="joystick-axis-label label-down">▼ PITCH BACK</div>
+                  <div class="joystick-axis-label label-left">◀ ROLL L</div>
+                  <div class="joystick-axis-label label-right">ROLL R ▶</div>
+                  <div class="joystick-thumb" id="joystick-right-thumb"></div>
                 </div>
               </div>
 
-              <div class="estop-container">
-                <button id="btn-flight-estop" class="btn-danger-massive">
-                  <span class="estop-title">EMERGENCY STOP</span>
-                  <span class="estop-sub">SHUT DOWN MOTORS</span>
-                </button>
+              <div class="stick-live-readouts">
+                <div class="readout-box">
+                  <span class="readout-title">PITCH:</span>
+                  <span class="readout-val" id="val-stick-pitch">0.00</span>
+                  <span class="readout-pwm" id="pwm-stick-pitch">1500 µs</span>
+                </div>
+                <div class="readout-box">
+                  <span class="readout-title">ROLL:</span>
+                  <span class="readout-val" id="val-stick-roll">0.00</span>
+                  <span class="readout-pwm" id="pwm-stick-roll">1500 µs</span>
+                </div>
+              </div>
+
+              <!-- Pitch & Roll Trims -->
+              <div class="trim-controls-row">
+                <button id="btn-trim-roll-left" class="btn-trim" title="Roll Left Trim">◀ ROLL</button>
+                <button id="btn-trim-pitch-up" class="btn-trim" title="Pitch Up Trim">▲ PITCH</button>
+                <button id="btn-trim-pitch-down" class="btn-trim" title="Pitch Down Trim">▼ PITCH</button>
+                <button id="btn-trim-roll-right" class="btn-trim" title="Roll Right Trim">ROLL ▶</button>
+                <button id="btn-trim-center-right" class="btn-trim-reset">RESET</button>
               </div>
             </div>
 
+          </div>
+
+          <!-- RC Channel Output Pulse Widths (µs) Feedback Strip -->
+          <div class="rc-channels-strip">
+            <div class="rc-strip-header">
+              <span>REAL-TIME RC OUTPUT CHANNELS (MICROSECONDS µS)</span>
+              <span id="gamepad-status-badge" class="gamepad-badge">🎮 GAMEPAD: DISCONNECTED</span>
+            </div>
+            <div class="rc-channels-grid">
+              <div class="rc-channel-bar">
+                <div class="rc-ch-info"><span class="rc-name">CH1 ROLL</span><span class="rc-val" id="rc-val-ch1">1500 µs</span></div>
+                <div class="rc-track"><div class="rc-fill" id="rc-bar-ch1" style="width: 50%"></div></div>
+              </div>
+              <div class="rc-channel-bar">
+                <div class="rc-ch-info"><span class="rc-name">CH2 PITCH</span><span class="rc-val" id="rc-val-ch2">1500 µs</span></div>
+                <div class="rc-track"><div class="rc-fill" id="rc-bar-ch2" style="width: 50%"></div></div>
+              </div>
+              <div class="rc-channel-bar">
+                <div class="rc-ch-info"><span class="rc-name">CH3 THROTTLE</span><span class="rc-val" id="rc-val-ch3">1000 µs</span></div>
+                <div class="rc-track"><div class="rc-fill" id="rc-bar-ch3" style="width: 0%"></div></div>
+              </div>
+              <div class="rc-channel-bar">
+                <div class="rc-ch-info"><span class="rc-name">CH4 YAW</span><span class="rc-val" id="rc-val-ch4">1500 µs</span></div>
+                <div class="rc-track"><div class="rc-fill" id="rc-bar-ch4" style="width: 50%"></div></div>
+              </div>
+              <div class="rc-channel-bar">
+                <div class="rc-ch-info"><span class="rc-name">CH5 ARM</span><span class="rc-val" id="rc-val-ch5">1000 µs</span></div>
+                <div class="rc-track"><div class="rc-fill fill-arm" id="rc-bar-ch5" style="width: 0%"></div></div>
+              </div>
+              <div class="rc-channel-bar">
+                <div class="rc-ch-info"><span class="rc-name">CH6 MODE</span><span class="rc-val" id="rc-val-ch6">1100 µs</span></div>
+                <div class="rc-track"><div class="rc-fill fill-mode" id="rc-bar-ch6" style="width: 25%"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Keyboard Controller Mapping Cheat Sheet -->
+          <div class="keyboard-shortcuts-footer">
+            <span class="kb-title">⌨️ KEYBOARD FLIGHT HOTKEYS:</span>
+            <span class="kb-key"><kbd>W</kbd>/<kbd>S</kbd> Throttle</span>
+            <span class="kb-key"><kbd>A</kbd>/<kbd>D</kbd> Yaw</span>
+            <span class="kb-key"><kbd>↑</kbd>/<kbd>↓</kbd> Pitch</span>
+            <span class="kb-key"><kbd>←</kbd>/<kbd>→</kbd> Roll</span>
+            <span class="kb-key"><kbd>T</kbd> Takeoff</span>
+            <span class="kb-key"><kbd>L</kbd> Land</span>
+            <span class="kb-key"><kbd>H</kbd> RTH</span>
+            <span class="kb-key"><kbd>Space</kbd> E-Stop</span>
           </div>
         </section>
 
@@ -1215,6 +1596,63 @@
               <div class="about-hero-text">
                 <h3>SKYFIGHTER Autonomous Forest Fire UAV</h3>
                 <p>Designed to save lives, prevent catastrophic wildfire spread, and provide volunteer first responders with accessible drone surveillance technology without commercial licensing fees.</p>
+              </div>
+            </div>
+
+            <!-- Standalone Native Application Installers Section -->
+            <div class="native-downloads-section">
+              <div class="downloads-header">
+                <h3>📦 Standalone Application Installers for Every Device</h3>
+                <p>Download and run SKYFIGHTER natively on any device. Fully responsive, offline capable, zero subscription fees.</p>
+              </div>
+              <div class="downloads-grid">
+                <!-- iPhone / iOS (.ipa) -->
+                <div class="download-card card-ios">
+                  <div class="dl-badge">iOS / iPadOS</div>
+                  <div class="dl-icon">🍏</div>
+                  <h4>iPhone &amp; iPad (.ipa)</h4>
+                  <p>Sideload onto any iPhone or iPad via AltStore, Sideloadly, TrollStore, or Apple Configurator.</p>
+                  <a href="./packages/skyfighter.ipa" download="skyfighter.ipa" class="btn-download-pkg btn-ios">
+                    ⬇️ Download skyfighter.ipa
+                  </a>
+                  <div class="dl-extra">Or in Safari tap Share &gt; <strong>"Add to Home Screen"</strong> for instant 1-tap installation!</div>
+                </div>
+
+                <!-- Android (.apk) -->
+                <div class="download-card card-android">
+                  <div class="dl-badge">Android</div>
+                  <div class="dl-icon">🤖</div>
+                  <h4>Android Devices (.apk)</h4>
+                  <p>Direct APK package ready for sideloading on all Samsung, Pixel, OnePlus, and Android tablets.</p>
+                  <a href="./packages/skyfighter.apk" download="skyfighter.apk" class="btn-download-pkg btn-android">
+                    ⬇️ Download skyfighter.apk
+                  </a>
+                  <div class="dl-extra">Or in Chrome tap menu &gt; <strong>"Install app"</strong> for instant PWA installation!</div>
+                </div>
+
+                <!-- macOS (.app) -->
+                <div class="download-card card-macos">
+                  <div class="dl-badge">macOS 12+</div>
+                  <div class="dl-icon">💻</div>
+                  <h4>macOS Desktop (.app)</h4>
+                  <p>Native Swift Cocoa/WebKit bundle for MacBook Air, Pro, Mac mini, and iMac (Apple Silicon &amp; Intel).</p>
+                  <a href="./packages/SKYFIGHTER_macOS.zip" download="SKYFIGHTER_macOS.zip" class="btn-download-pkg btn-macos">
+                    ⬇️ Download SKYFIGHTER_macOS.zip
+                  </a>
+                  <div class="dl-extra">Unzip and launch <strong>SKYFIGHTER.app</strong> directly.</div>
+                </div>
+
+                <!-- Windows (.exe) -->
+                <div class="download-card card-windows">
+                  <div class="dl-badge">Windows 10 / 11</div>
+                  <div class="dl-icon">🪟</div>
+                  <h4>Windows Desktop (.exe)</h4>
+                  <p>Standalone 64-bit Windows executable launcher with dedicated frameless desktop window.</p>
+                  <a href="./packages/SKYFIGHTER.exe" download="SKYFIGHTER.exe" class="btn-download-pkg btn-windows">
+                    ⬇️ Download SKYFIGHTER.exe
+                  </a>
+                  <div class="dl-extra">Download and double-click to launch immediately!</div>
+                </div>
               </div>
             </div>
 

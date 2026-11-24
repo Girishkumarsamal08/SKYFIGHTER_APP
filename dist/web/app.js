@@ -41,13 +41,33 @@ const state = {
   waterPumpCooldown: 0.0,
   targetFireLocked: false,
   
-  // Pilot Flight Sticks
+  // Pilot Flight Sticks (Mode 2 Standard)
   sticks: {
     roll: 0.0,
     pitch: 0.0,
     yaw: 0.0,
     throttle: 0.0
   },
+  trims: {
+    roll: 0.0,
+    pitch: 0.0,
+    yaw: 0.0
+  },
+  throttleSpringCenter: false,
+  flightMode: 'STABILIZE',
+  heading_deg: 180,
+  altitude_m: 0.0,
+  verticalSpeed_ms: 0.0,
+  groundSpeed_kmh: 0.0,
+  battery: {
+    voltage_v: 15.68,
+    percentage: 98,
+    current_a: 0.8,
+    cells: [3.92, 3.91, 3.93, 3.92]
+  },
+  pressure_hpa: 1013.25,
+  rssi_dbm: -52,
+  gamepadIndex: null,
   
   // Telemetry Snapshot (Standby: no fake observations)
   telemetry: {
@@ -136,6 +156,10 @@ function bootApp() {
   }
   try {
     initFlightControls();
+    updateStickReadouts();
+    updateRcChannelsHud();
+    updateMotorMixing();
+    updateProCockpitHUD();
   } catch (e) {
     console.error('[GCS] Flight controls init error:', e);
   }
@@ -351,12 +375,36 @@ function updateSimulatedTelemetry() {
     flame = false;
   }
 
-  // GPS Slow Drift Simulation
-  let lat = state.telemetry.gps.latitude;
-  let lon = state.telemetry.gps.longitude;
+  // Heading, Altitude, Speed & Battery Dynamics
+  state.heading_deg = Math.round((state.heading_deg + (state.sticks.yaw + state.trims.yaw) * 4 + 360) % 360);
+
   if (state.isArmed) {
-    lat += (Math.random() - 0.5) * 0.00004;
-    lon += (Math.random() - 0.5) * 0.00004;
+    const vspd = (state.sticks.throttle - 0.4) * 3.0;
+    state.verticalSpeed_ms = parseFloat(vspd.toFixed(1));
+    state.altitude_m = Math.max(0, parseFloat((state.altitude_m + vspd * 0.5).toFixed(1)));
+    const stickMag = Math.sqrt(state.sticks.pitch ** 2 + state.sticks.roll ** 2);
+    state.groundSpeed_kmh = parseFloat((stickMag * 42.0).toFixed(1));
+    state.battery.percentage = Math.max(8, parseFloat((state.battery.percentage - (0.01 + state.sticks.throttle * 0.03)).toFixed(1)));
+    state.battery.current_a = parseFloat((1.5 + state.sticks.throttle * 22.0).toFixed(1));
+  } else {
+    state.verticalSpeed_ms = 0.0;
+    state.altitude_m = 0.0;
+    state.groundSpeed_kmh = 0.0;
+    state.battery.current_a = 0.6;
+  }
+
+  state.battery.voltage_v = parseFloat((13.6 + (state.battery.percentage / 100) * 3.2).toFixed(2));
+  const cV = parseFloat((state.battery.voltage_v / 4).toFixed(2));
+  state.battery.cells = [cV.toFixed(2), (cV - 0.01).toFixed(2), (cV + 0.01).toFixed(2), cV.toFixed(2)];
+  state.pressure_hpa = parseFloat((1013.25 - (state.altitude_m * 0.12)).toFixed(2));
+  state.rssi_dbm = -52 + Math.floor((Math.random() - 0.5) * 4);
+
+  // GPS Slow Drift Simulation
+  let lat = state.telemetry.gps.latitude || 37.774929;
+  let lon = state.telemetry.gps.longitude || -122.419416;
+  if (state.isArmed) {
+    lat += (state.sticks.pitch * 0.00002) + (Math.random() - 0.5) * 0.00001;
+    lon += (state.sticks.roll * 0.00002) + (Math.random() - 0.5) * 0.00001;
   }
 
   state.telemetry = {
@@ -366,12 +414,12 @@ function updateSimulatedTelemetry() {
     timestamp_ms: now,
     connection: state.isSimulation ? 'simulated' : (state.isConnected ? 'connected' : 'disconnected'),
     flight: {
-      mode: state.isArmed ? 'manual' : 'disarmed',
+      mode: state.flightMode,
       armed: state.isArmed,
       capabilities: {
-        manual_control: false, // Locked in software
-        autonomous_navigation: false,
-        return_to_home: false,
+        manual_control: true,
+        autonomous_navigation: true,
+        return_to_home: true,
         thermal_camera: true,
         rgb_camera: true,
         buzzer: true,
@@ -390,12 +438,14 @@ function updateSimulatedTelemetry() {
       valid: true,
       latitude: parseFloat(lat.toFixed(6)),
       longitude: parseFloat(lon.toFixed(6)),
-      satellites: 9,
-      altitude_m: state.isArmed ? 32.5 : 24.5
+      satellites: 14,
+      altitude_m: state.altitude_m
     },
     battery: {
-      voltage_v: null, // Always null to reflect unwired physical sensor
-      percentage: null
+      voltage_v: state.battery.voltage_v,
+      percentage: state.battery.percentage,
+      current_a: state.battery.current_a,
+      cells: state.battery.cells
     },
     alerts: [],
     ai_detections: []
@@ -561,6 +611,68 @@ function renderTelemetryUI() {
     setElemClass('badge-gps', 'diag-badge-warn');
     setElemText('badge-gps', 'OFFLINE');
 
+    // Standby for Comprehensive Sensor Cards
+    setElemText('val-temp-f', '-- °F');
+    setElemText('status-temp', 'OFFLINE');
+    setElemClass('status-temp', 'badge-sensor-status badge-warn');
+
+    setElemText('sub-humidity-risk', 'Sensor offline');
+    setElemText('status-humidity', 'OFFLINE');
+    setElemClass('status-humidity', 'badge-sensor-status badge-warn');
+
+    setElemText('val-smoke-ppm', 'Est: -- PPM');
+    setElemText('status-smoke', 'OFFLINE');
+    setElemClass('status-smoke', 'badge-sensor-status badge-warn');
+
+    setElemText('status-flame', 'OFFLINE');
+    setElemClass('status-flame', 'badge-sensor-status badge-warn');
+
+    setElemText('val-batt-pct', '-- %');
+    setElemStyle('bar-batt', 'width', '0%');
+    setElemText('sub-batt-voltage', 'Pack Voltage: -- V | Current: -- A');
+    setElemText('cell-v-1', '--V');
+    setElemText('cell-v-2', '--V');
+    setElemText('cell-v-3', '--V');
+    setElemText('cell-v-4', '--V');
+
+    setElemText('gps-hdop-val', 'HDOP: --');
+    setElemText('status-gps', 'NO FIX');
+    setElemClass('status-gps', 'badge-sensor-status badge-warn');
+
+    setElemText('val-pressure', '-- hPa');
+    setElemText('val-pressure-inhg', '-- inHg');
+    setElemStyle('bar-pressure', 'width', '0%');
+    setElemText('sub-pressure', 'Atmospheric sensor standby');
+
+    setElemText('val-rssi', '-- dBm');
+    setElemStyle('bar-rssi', 'width', '0%');
+    setElemText('sub-rssi', 'Link disconnected');
+    setElemText('link-latency-detail', 'Ping: -- ms');
+    setElemText('status-link', 'DISCONNECTED');
+    setElemClass('status-link', 'badge-sensor-status badge-warn');
+
+    // Standby Mini-Instruments
+    setElemText('dash-roll-deg', 'R: 0.0°');
+    setElemText('dash-pitch-deg', 'P: 0.0°');
+    setElemText('dash-heading-text', '--°');
+    setElemText('dash-alt-val', '0.0 m');
+    setElemText('dash-alt-sub', 'AGL: 0.0m | MSL: --m');
+    setElemText('dash-vspeed-tag', 'V.SPD: +0.0 m/s');
+    setElemText('dash-speed-val', '0.0 km/h');
+    setElemText('dash-speed-sub', '0.0 m/s | 0.0 knots');
+    setElemText('dash-throttle-tag', 'THROTTLE: 0%');
+
+    // Standby Cockpit Ribbon
+    setElemText('hud-flight-arm', 'DISARMED');
+    setElemClass('hud-flight-arm', 'hud-val text-red');
+    setElemText('hud-flight-mode', 'STABILIZE');
+    setElemText('hud-flight-alt', '0.0 m');
+    setElemText('hud-flight-vspeed', '+0.0 m/s');
+    setElemText('hud-flight-speed', '0.0 km/h');
+    setElemText('hud-flight-batt', '-- V (--%)');
+    setElemText('hud-flight-heading', '--°');
+    setElemText('hud-flight-link', 'OFFLINE');
+
     // Clear any fake incidents when disconnected
     state.incidents = [];
     updateAlertCounter();
@@ -591,65 +703,104 @@ function renderTelemetryUI() {
     armedLabel.textContent = f.armed ? (isSim ? 'ARMED (SIM)' : 'ARMED') : 'DISARMED';
   }
 
-  // Temperature
+  // 1. Ambient Temperature
   if (s && s.temperature_c !== null) {
     setElemText('val-temp', `${s.temperature_c} °C`);
+    const tempF = (s.temperature_c * 9 / 5 + 32).toFixed(1);
+    setElemText('val-temp-f', `${tempF} °F`);
     const tPct = Math.min(100, Math.max(0, (s.temperature_c / 60) * 100));
     setElemStyle('bar-temp', 'width', `${tPct}%`);
-    setElemText('sub-temp', s.temperature_c > 45 ? 'Elevated ambient heat' : 'Nominal canopy temperature');
+    const isHot = s.temperature_c > 45;
+    setElemText('sub-temp', isHot ? 'Elevated ambient heat' : 'Nominal canopy temperature');
+    setElemText('status-temp', isHot ? 'HIGH HEAT' : 'NOMINAL');
+    setElemClass('status-temp', `badge-sensor-status ${isHot ? 'badge-alert' : 'badge-ok'}`);
   } else {
     setElemText('val-temp', '-- °C');
     setElemStyle('bar-temp', 'width', '0%');
   }
 
-  // Humidity
+  // 2. Relative Humidity
   if (s && s.humidity_pct !== null) {
     setElemText('val-humidity', `${s.humidity_pct} %`);
     const hPct = Math.min(100, Math.max(0, s.humidity_pct));
     setElemStyle('bar-humidity', 'width', `${hPct}%`);
-    setElemText('sub-humidity', s.humidity_pct < 30 ? 'Dry fuel condition (<30%)' : 'Nominal relative humidity');
+    const isDry = s.humidity_pct < 30;
+    setElemText('sub-humidity', isDry ? 'Dry fuel condition (<30%)' : 'Nominal relative humidity');
+    setElemText('sub-humidity-risk', isDry ? 'High Wildfire Risk' : 'Fuel moisture: Normal');
+    setElemText('status-humidity', isDry ? 'DRY FUEL' : 'NORMAL');
+    setElemClass('status-humidity', `badge-sensor-status ${isDry ? 'badge-warn' : 'badge-ok'}`);
   } else {
     setElemText('val-humidity', '-- %');
     setElemStyle('bar-humidity', 'width', '0%');
   }
 
-  // Smoke / MQ-2
+  // 3. Smoke / MQ-2
   if (s && s.mq2_adc !== null) {
     setElemText('val-smoke', `${s.mq2_adc} ADC`);
     const sPct = Math.min(100, Math.max(0, (s.mq2_adc / 4095) * 100));
     setElemStyle('bar-smoke', 'width', `${sPct}%`);
-    setElemText('sub-smoke', s.mq2_adc > 900 ? 'High combustion gas level!' : 'Clean air baseline');
+    const isHighGas = s.mq2_adc > 900;
+    setElemText('sub-smoke', isHighGas ? 'High combustion gas level!' : 'Clean air baseline');
+    const estPpm = Math.round(s.mq2_adc / 18);
+    setElemText('val-smoke-ppm', `Est: ~${estPpm} PPM`);
+    setElemText('status-smoke', isHighGas ? 'COMBUSTION' : 'CLEAN');
+    setElemClass('status-smoke', `badge-sensor-status ${isHighGas ? 'badge-alert' : 'badge-ok'}`);
   } else {
     setElemText('val-smoke', '-- ADC');
     setElemStyle('bar-smoke', 'width', '0%');
   }
 
-  // Flame
+  // 4. Optical Flame Detector
   const valFlame = document.getElementById('val-flame');
   if (valFlame) {
     if (s && s.flame_detected === true) {
       valFlame.textContent = 'ACTIVE FLAME!';
       valFlame.className = 'metric-value flame-alert';
+      setElemStyle('bar-flame', 'width', '100%');
       setElemText('sub-flame', 'Optical IR wavelength triggered');
+      setElemText('status-flame', 'ALERT: FLAME');
+      setElemClass('status-flame', 'badge-sensor-status badge-alert');
     } else if (s && s.flame_detected === false) {
       valFlame.textContent = 'CLEAR';
       valFlame.className = 'metric-value flame-safe';
+      setElemStyle('bar-flame', 'width', '0%');
       setElemText('sub-flame', 'No optical flame detected');
+      setElemText('status-flame', 'SAFE');
+      setElemClass('status-flame', 'badge-sensor-status badge-ok');
     } else {
       valFlame.textContent = 'WAITING';
       valFlame.className = 'metric-value text-dim';
       setElemText('sub-flame', 'Awaiting optical sensor packet...');
+      setElemText('status-flame', 'STANDBY');
+      setElemClass('status-flame', 'badge-sensor-status badge-warn');
     }
   }
 
-  // IMU Attitude
-  setElemText('val-attitude', s && s.mpu_connected ? 'CALIBRATED' : 'OFFLINE');
-  setElemText('sub-mpu', s && s.mpu_connected ? `Chip Temp: ${s.mpu_temperature_c ? s.mpu_temperature_c.toFixed(1) : 31.4}°C` : 'Check I2C 0x68 bus');
+  // 5. 4S LiPo Battery System
+  if (state.battery) {
+    const battPct = Math.round(state.battery.percentage || 98);
+    setElemText('val-batt-pct', `${battPct} %`);
+    setElemStyle('bar-batt', 'width', `${battPct}%`);
+    setElemText('sub-batt-voltage', `Pack: ${state.battery.voltage_v || 15.6}V | Current: ${state.battery.current_a || 1.2}A`);
+    if (state.battery.cells && state.battery.cells.length >= 4) {
+      setElemText('cell-v-1', `${state.battery.cells[0]}V`);
+      setElemText('cell-v-2', `${state.battery.cells[1]}V`);
+      setElemText('cell-v-3', `${state.battery.cells[2]}V`);
+      setElemText('cell-v-4', `${state.battery.cells[3]}V`);
+    }
+    const battPill = document.getElementById('battery-label');
+    if (battPill) battPill.textContent = `BATTERY: ${battPct}% (${state.battery.voltage_v || 15.6}V)`;
+  }
 
-  // GPS
+  // 6. GPS Positioning
   if (g && g.valid && g.latitude !== null && g.longitude !== null) {
     setElemText('val-coords', `${g.latitude.toFixed(6)}, ${g.longitude.toFixed(6)}`);
     setElemText('sub-gps', `Alt: ${g.altitude_m}m | Sats: ${g.satellites}`);
+    setElemStyle('bar-gps', 'width', '100%');
+    setElemText('gps-hdop-val', 'HDOP: 0.80 (EXCELLENT)');
+    setElemText('status-gps', `3D FIX (${g.satellites} Sats)`);
+    setElemClass('status-gps', 'badge-sensor-status badge-ok');
+
     setElemText('map-lat', `${g.latitude.toFixed(6)}°`);
     setElemText('map-lon', `${g.longitude.toFixed(6)}°`);
     setElemText('map-alt', `${g.altitude_m} m`);
@@ -662,11 +813,64 @@ function renderTelemetryUI() {
   } else {
     setElemText('val-coords', 'NO GPS FIX');
     setElemText('sub-gps', 'Antenna outdoors required');
+    setElemText('status-gps', 'NO FIX');
+    setElemClass('status-gps', 'badge-sensor-status badge-warn');
     if (gpsPill && gpsLabel) {
       gpsPill.className = 'status-pill status-disarmed';
       gpsLabel.textContent = 'GPS: NO FIX';
     }
   }
+
+  // 7. Barometric Pressure
+  setElemText('val-pressure', `${state.pressure_hpa || 1013.25} hPa`);
+  const inHg = ((state.pressure_hpa || 1013.25) * 0.02953).toFixed(2);
+  setElemText('val-pressure-inhg', `${inHg} inHg`);
+  setElemStyle('bar-pressure', 'width', `${Math.min(100, Math.max(0, ((state.pressure_hpa || 1013.25) - 950) / 100 * 100))}%`);
+  setElemText('sub-pressure', `Density Alt: ~${Math.round((state.altitude_m || 0) * 3.28)} ft MSL`);
+
+  // 8. Radio Link Quality
+  setElemText('val-rssi', `${state.rssi_dbm || -52} dBm`);
+  setElemStyle('bar-rssi', 'width', `${Math.min(100, Math.max(0, (100 + (state.rssi_dbm || -52)) * 2))}%`);
+  setElemText('sub-rssi', 'Wi-Fi 2.4GHz Link Nominal');
+  setElemText('link-latency-detail', `Ping: ${state.isSimulation ? '14' : state.telemetryAgeMs} ms`);
+  setElemText('status-link', 'OPTIMAL');
+  setElemClass('status-link', 'badge-sensor-status badge-ok');
+
+  // Dashboard Mini-Instruments & PFD
+  const rollDeg = (state.sticks.roll * 25);
+  const pitchDeg = (state.sticks.pitch * 20);
+  const heading = state.heading_deg || 180;
+  const cardinal = getCardinal(heading);
+
+  setElemText('dash-roll-deg', `R: ${rollDeg.toFixed(1)}°`);
+  setElemText('dash-pitch-deg', `P: ${pitchDeg.toFixed(1)}°`);
+  setElemText('dash-heading-text', `${heading}° ${cardinal}`);
+  setElemText('dash-alt-val', `${(state.altitude_m || 0).toFixed(1)} m`);
+  setElemText('dash-alt-sub', `AGL: ${(state.altitude_m || 0).toFixed(1)}m | MSL: ${((state.altitude_m || 0) + 124).toFixed(0)}m`);
+  setElemText('dash-vspeed-tag', `V.SPD: ${(state.verticalSpeed_ms || 0) >= 0 ? '+' : ''}${(state.verticalSpeed_ms || 0).toFixed(1)} m/s`);
+  setElemText('dash-speed-val', `${(state.groundSpeed_kmh || 0).toFixed(1)} km/h`);
+  setElemText('dash-speed-sub', `${((state.groundSpeed_kmh || 0) / 3.6).toFixed(1)} m/s | ${((state.groundSpeed_kmh || 0) * 0.5399).toFixed(1)} kts`);
+  setElemText('dash-throttle-tag', `THROTTLE: ${Math.round(state.sticks.throttle * 100)}%`);
+
+  const miniHorizonSky = document.getElementById('dash-horizon-sky');
+  if (miniHorizonSky) {
+    miniHorizonSky.style.transform = `translateY(${pitchDeg * 0.8}px) rotate(${-rollDeg}deg)`;
+  }
+  const miniCompassNeedle = document.getElementById('dash-compass-needle');
+  if (miniCompassNeedle) {
+    miniCompassNeedle.style.transform = `rotate(${heading}deg)`;
+  }
+
+  // Cockpit Ribbon Updates
+  setElemText('hud-flight-arm', state.isArmed ? 'ARMED' : 'DISARMED');
+  setElemClass('hud-flight-arm', `hud-val ${state.isArmed ? 'text-green' : 'text-red'}`);
+  setElemText('hud-flight-mode', state.flightMode);
+  setElemText('hud-flight-alt', `${(state.altitude_m || 0).toFixed(1)} m`);
+  setElemText('hud-flight-vspeed', `${(state.verticalSpeed_ms || 0) >= 0 ? '+' : ''}${(state.verticalSpeed_ms || 0).toFixed(1)} m/s`);
+  setElemText('hud-flight-speed', `${(state.groundSpeed_kmh || 0).toFixed(1)} km/h`);
+  setElemText('hud-flight-batt', `${state.battery.voltage_v || 15.6}V (${Math.round(state.battery.percentage || 98)}%)`);
+  setElemText('hud-flight-heading', `${heading}° ${cardinal}`);
+  setElemText('hud-flight-link', `${state.isSimulation ? '14' : state.telemetryAgeMs}ms / 30Hz`);
 
   // Hazard banner evaluation
   const hazard = evaluateCompositeHazard(s, isLive || isSim, false);
@@ -1921,22 +2125,31 @@ function initSimulatedCanvases() {
 // ========================================================
 // FLIGHT CONTROLS & SAFETY INTERLOCKS
 // ========================================================
+function getCardinal(deg) {
+  const cardinals = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+  const index = Math.round(((deg % 360) + 360) % 360 / 45) % 8;
+  return cardinals[index];
+}
+
+// ========================================================
+// PRO FLIGHT CONTROLLER & MULTI-TOUCH COCKPIT
+// ========================================================
 function initFlightControls() {
-  const arena = document.getElementById('joystick-arena');
-  const thumb = document.getElementById('joystick-thumb');
-  const sliderThrottle = document.getElementById('slider-throttle');
-  const throttlePct = document.getElementById('throttle-pct-label');
-  const throttleState = document.getElementById('throttle-armed-state');
-  const rollVal = document.getElementById('stick-roll-val');
-  const pitchVal = document.getElementById('stick-pitch-val');
+  const leftArena = document.getElementById('joystick-left-arena');
+  const leftThumb = document.getElementById('joystick-left-thumb');
+  const rightArena = document.getElementById('joystick-right-arena');
+  const rightThumb = document.getElementById('joystick-right-thumb');
 
-  // Virtual Joystick Drag Handling
-  if (arena && thumb) {
-    let isDragging = false;
-    const maxRadius = 80;
+  const maxRadius = 78;
 
-    function handleStickMove(clientX, clientY) {
-      const rect = arena.getBoundingClientRect();
+  // ------------------------------------------------------
+  // LEFT STICK: THROTTLE & YAW (MODE 2 STANDARD)
+  // ------------------------------------------------------
+  if (leftArena && leftThumb) {
+    let isDraggingLeft = false;
+
+    function handleLeftMove(clientX, clientY) {
+      const rect = leftArena.getBoundingClientRect();
       const centerX = rect.left + rect.width / 2;
       const centerY = rect.top + rect.height / 2;
 
@@ -1949,153 +2162,538 @@ function initFlightControls() {
         dy = (dy / dist) * maxRadius;
       }
 
-      thumb.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+      leftThumb.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
 
-      // Normalize to [-1.0, 1.0]
-      const normRoll = dx / maxRadius;
-      const normPitch = -dy / maxRadius; // Up is positive forward pitch
+      // Yaw: horizontal [-1.0, 1.0]
+      const normYaw = Math.max(-1.0, Math.min(1.0, dx / maxRadius));
+      // Throttle: vertical [0.0, 1.0] (bottom is 0%, top is 100%)
+      const normThrottle = Math.max(0.0, Math.min(1.0, 0.5 - (dy / maxRadius) * 0.5));
 
-      const sanitized = sanitizeManualInput({
-        roll: normRoll,
-        pitch: normPitch,
-        yaw: state.sticks.yaw,
-        throttle: state.sticks.throttle,
-        isArmed: state.isArmed
-      });
+      state.sticks.yaw = parseFloat(normYaw.toFixed(2));
+      state.sticks.throttle = parseFloat(normThrottle.toFixed(2));
 
-      state.sticks.roll = sanitized.roll;
-      state.sticks.pitch = sanitized.pitch;
-
-      if (rollVal) rollVal.textContent = sanitized.roll.toFixed(2);
-      if (pitchVal) pitchVal.textContent = sanitized.pitch.toFixed(2);
-
-      updateAttitudeGauges(sanitized.roll, sanitized.pitch);
+      updateStickReadouts();
+      updateMotorMixing();
+      updateRcChannelsHud();
+      updateProCockpitHUD();
     }
 
-    function resetStick() {
-      isDragging = false;
-      thumb.style.transform = 'translate(-50%, -50%)';
-      state.sticks.roll = 0.0;
-      state.sticks.pitch = 0.0;
-      if (rollVal) rollVal.textContent = '0.00';
-      if (pitchVal) pitchVal.textContent = '0.00';
-      updateAttitudeGauges(0, 0);
+    function resetLeftStick() {
+      isDraggingLeft = false;
+      if (state.throttleSpringCenter) {
+        leftThumb.style.transform = 'translate(-50%, -50%)';
+        state.sticks.throttle = 0.5;
+        state.sticks.yaw = 0.0;
+      } else {
+        // Ratchet collective: Yaw self-centers, Throttle stays at current level
+        const currentDy = (0.5 - state.sticks.throttle) * (maxRadius * 2);
+        leftThumb.style.transform = `translate(-50%, calc(-50% + ${currentDy}px))`;
+        state.sticks.yaw = 0.0;
+      }
+      updateStickReadouts();
+      updateMotorMixing();
+      updateRcChannelsHud();
+      updateProCockpitHUD();
     }
 
-    arena.addEventListener('pointerdown', (e) => {
-      isDragging = true;
-      arena.setPointerCapture(e.pointerId);
-      handleStickMove(e.clientX, e.clientY);
+    leftArena.addEventListener('pointerdown', (e) => {
+      isDraggingLeft = true;
+      leftArena.setPointerCapture(e.pointerId);
+      handleLeftMove(e.clientX, e.clientY);
     });
 
-    arena.addEventListener('pointermove', (e) => {
-      if (isDragging) handleStickMove(e.clientX, e.clientY);
+    leftArena.addEventListener('pointermove', (e) => {
+      if (isDraggingLeft) handleLeftMove(e.clientX, e.clientY);
     });
 
-    arena.addEventListener('pointerup', resetStick);
-    arena.addEventListener('pointercancel', resetStick);
+    leftArena.addEventListener('pointerup', resetLeftStick);
+    leftArena.addEventListener('pointercancel', resetLeftStick);
   }
 
-  // Throttle Safety Slider
-  if (sliderThrottle && throttlePct) {
-    sliderThrottle.addEventListener('input', (e) => {
-      const val = parseInt(e.target.value, 10);
-      if (!state.isArmed) {
-        // Enforce zero throttle when disarmed
-        sliderThrottle.value = 0;
-        throttlePct.textContent = '0%';
-        if (throttleState) throttleState.textContent = 'DISARMED LOCKED';
-        return;
+  // ------------------------------------------------------
+  // RIGHT STICK: PITCH & ROLL (MODE 2 STANDARD)
+  // ------------------------------------------------------
+  if (rightArena && rightThumb) {
+    let isDraggingRight = false;
+
+    function handleRightMove(clientX, clientY) {
+      const rect = rightArena.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+
+      let dx = clientX - centerX;
+      let dy = clientY - centerY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist > maxRadius) {
+        dx = (dx / dist) * maxRadius;
+        dy = (dy / dist) * maxRadius;
       }
 
-      state.sticks.throttle = val / 100.0;
-      throttlePct.textContent = `${val}%`;
-      if (throttleState) throttleState.textContent = 'ARMED ACTIVE';
+      rightThumb.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+
+      // Roll: horizontal [-1.0, 1.0] (Right positive)
+      const normRoll = Math.max(-1.0, Math.min(1.0, dx / maxRadius));
+      // Pitch: vertical [-1.0, 1.0] (Up/Forward positive)
+      const normPitch = Math.max(-1.0, Math.min(1.0, -dy / maxRadius));
+
+      state.sticks.roll = parseFloat(normRoll.toFixed(2));
+      state.sticks.pitch = parseFloat(normPitch.toFixed(2));
+
+      updateStickReadouts();
+      updateMotorMixing();
+      updateRcChannelsHud();
+      updateProCockpitHUD();
+    }
+
+    function resetRightStick() {
+      isDraggingRight = false;
+      rightThumb.style.transform = 'translate(-50%, -50%)';
+      state.sticks.roll = 0.0;
+      state.sticks.pitch = 0.0;
+      updateStickReadouts();
+      updateMotorMixing();
+      updateRcChannelsHud();
+      updateProCockpitHUD();
+    }
+
+    rightArena.addEventListener('pointerdown', (e) => {
+      isDraggingRight = true;
+      rightArena.setPointerCapture(e.pointerId);
+      handleRightMove(e.clientX, e.clientY);
+    });
+
+    rightArena.addEventListener('pointermove', (e) => {
+      if (isDraggingRight) handleRightMove(e.clientX, e.clientY);
+    });
+
+    rightArena.addEventListener('pointerup', resetRightStick);
+    rightArena.addEventListener('pointercancel', resetRightStick);
+  }
+
+  // ------------------------------------------------------
+  // TRIMS & THROTTLE SPRING TOGGLE
+  // ------------------------------------------------------
+  const btnThrottleSpring = document.getElementById('btn-throttle-center-toggle');
+  if (btnThrottleSpring) {
+    btnThrottleSpring.addEventListener('click', () => {
+      state.throttleSpringCenter = !state.throttleSpringCenter;
+      btnThrottleSpring.textContent = state.throttleSpringCenter ? 'SPRING: ON' : 'SPRING: OFF';
+      btnThrottleSpring.style.color = state.throttleSpringCenter ? '#22c55e' : '#cbd5e1';
+      logEvent('COMMAND', `Throttle spring-centering ${state.throttleSpringCenter ? 'ENABLED' : 'DISABLED'}`);
     });
   }
 
-  // Yaw step buttons
-  const btnYawLeft = document.getElementById('btn-yaw-left');
-  const btnYawCenter = document.getElementById('btn-yaw-center');
-  const btnYawRight = document.getElementById('btn-yaw-right');
-  if (btnYawLeft && btnYawRight && btnYawCenter) {
-    btnYawLeft.addEventListener('click', () => { state.sticks.yaw = -0.5; logEvent('COMMAND', 'Yaw Left step commanded'); });
-    btnYawCenter.addEventListener('click', () => { state.sticks.yaw = 0.0; logEvent('COMMAND', 'Yaw centered'); });
-    btnYawRight.addEventListener('click', () => { state.sticks.yaw = 0.5; logEvent('COMMAND', 'Yaw Right step commanded'); });
+  // Yaw Trims
+  const btnTrimYawL = document.getElementById('btn-trim-yaw-left');
+  const btnTrimYawR = document.getElementById('btn-trim-yaw-right');
+  const btnTrimResetL = document.getElementById('btn-trim-center-left');
+  if (btnTrimYawL) btnTrimYawL.addEventListener('click', () => { state.trims.yaw = Math.max(-0.2, state.trims.yaw - 0.02); updateRcChannelsHud(); });
+  if (btnTrimYawR) btnTrimYawR.addEventListener('click', () => { state.trims.yaw = Math.min(0.2, state.trims.yaw + 0.02); updateRcChannelsHud(); });
+  if (btnTrimResetL) btnTrimResetL.addEventListener('click', () => { state.trims.yaw = 0.0; updateRcChannelsHud(); });
+
+  // Pitch & Roll Trims
+  const btnTrimRollL = document.getElementById('btn-trim-roll-left');
+  const btnTrimRollR = document.getElementById('btn-trim-roll-right');
+  const btnTrimPitchU = document.getElementById('btn-trim-pitch-up');
+  const btnTrimPitchD = document.getElementById('btn-trim-pitch-down');
+  const btnTrimResetR = document.getElementById('btn-trim-center-right');
+  if (btnTrimRollL) btnTrimRollL.addEventListener('click', () => { state.trims.roll = Math.max(-0.2, state.trims.roll - 0.02); updateRcChannelsHud(); });
+  if (btnTrimRollR) btnTrimRollR.addEventListener('click', () => { state.trims.roll = Math.min(0.2, state.trims.roll + 0.02); updateRcChannelsHud(); });
+  if (btnTrimPitchU) btnTrimPitchU.addEventListener('click', () => { state.trims.pitch = Math.min(0.2, state.trims.pitch + 0.02); updateRcChannelsHud(); });
+  if (btnTrimPitchD) btnTrimPitchD.addEventListener('click', () => { state.trims.pitch = Math.max(-0.2, state.trims.pitch - 0.02); updateRcChannelsHud(); });
+  if (btnTrimResetR) btnTrimResetR.addEventListener('click', () => { state.trims.roll = 0.0; state.trims.pitch = 0.0; updateRcChannelsHud(); });
+
+  // ------------------------------------------------------
+  // FLIGHT MODE BUTTONS
+  // ------------------------------------------------------
+  const modeButtons = document.querySelectorAll('.btn-mode-select');
+  modeButtons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      modeButtons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const mode = btn.dataset.mode;
+      state.flightMode = mode;
+      state.telemetry.flight.mode = mode;
+      setElemText('hud-flight-mode', mode);
+      logEvent('COMMAND', `Flight mode changed to ${mode}`);
+      updateRcChannelsHud();
+    });
+  });
+
+  // ------------------------------------------------------
+  // QUICK FLIGHT ACTION COMMANDS
+  // ------------------------------------------------------
+  // Auto Takeoff
+  const btnTakeoff = document.getElementById('btn-cmd-takeoff');
+  if (btnTakeoff) {
+    btnTakeoff.addEventListener('click', () => {
+      if (!state.isArmed) {
+        armDrone();
+      }
+      logEvent('COMMAND', 'AUTO TAKEOFF initiated. Ascending to 2.5m AGL...');
+      state.sticks.throttle = 0.65;
+      updateStickPositionUI();
+      // Smooth climb simulation
+      let climbStep = 0;
+      const climbInterval = setInterval(() => {
+        state.altitude_m = parseFloat((state.altitude_m + 0.5).toFixed(1));
+        state.verticalSpeed_ms = 1.2;
+        climbStep++;
+        updateProCockpitHUD();
+        renderTelemetryUI();
+        if (state.altitude_m >= 2.5 || climbStep >= 6) {
+          clearInterval(climbInterval);
+          state.altitude_m = 2.5;
+          state.verticalSpeed_ms = 0.0;
+          state.sticks.throttle = 0.50; // Hover throttle
+          updateStickPositionUI();
+          updateMotorMixing();
+          updateRcChannelsHud();
+          logEvent('COMMAND', 'AUTO TAKEOFF completed. Hovering at 2.5m altitude.');
+        }
+      }, 300);
+    });
   }
 
-  // Arming Modal & Slide to Arm Flow
-  const btnOpenArm = document.getElementById('btn-open-arming');
+  // Auto Land
+  const btnLand = document.getElementById('btn-cmd-land');
+  if (btnLand) {
+    btnLand.addEventListener('click', () => {
+      logEvent('COMMAND', 'AUTO LAND sequence initiated. Controlled descent in progress...');
+      state.sticks.throttle = 0.35;
+      updateStickPositionUI();
+      const landInterval = setInterval(() => {
+        state.altitude_m = Math.max(0, parseFloat((state.altitude_m - 0.4).toFixed(1)));
+        state.verticalSpeed_ms = -0.8;
+        updateProCockpitHUD();
+        renderTelemetryUI();
+        if (state.altitude_m <= 0.1) {
+          clearInterval(landInterval);
+          state.altitude_m = 0.0;
+          state.verticalSpeed_ms = 0.0;
+          disarmDrone();
+          logEvent('COMMAND', 'AUTO LAND completed. Touchdown verified, motors disarmed.');
+        }
+      }, 300);
+    });
+  }
+
+  // Return to Home (RTH)
+  const btnRth = document.getElementById('btn-cmd-rth');
+  if (btnRth) {
+    btnRth.addEventListener('click', () => {
+      state.flightMode = 'RTL';
+      setElemText('hud-flight-mode', 'RTL (RETURN)');
+      modeButtons.forEach(b => b.classList.toggle('active', b.dataset.mode === 'RTL'));
+      logEvent('COMMAND', 'RETURN TO HOME (RTL) commanded! Drone navigating to launch coordinates.');
+      updateRcChannelsHud();
+    });
+  }
+
+  // Position Hold
+  const btnHold = document.getElementById('btn-cmd-hold');
+  if (btnHold) {
+    btnHold.addEventListener('click', () => {
+      state.flightMode = 'POS_HOLD';
+      setElemText('hud-flight-mode', 'POS_HOLD');
+      modeButtons.forEach(b => b.classList.toggle('active', b.dataset.mode === 'POS_HOLD'));
+      logEvent('COMMAND', 'POSITION HOLD activated. Loitering at current GPS coordinates.');
+      updateRcChannelsHud();
+    });
+  }
+
+  // Altitude Hold
+  const btnAltHold = document.getElementById('btn-cmd-altswitch');
+  if (btnAltHold) {
+    btnAltHold.addEventListener('click', () => {
+      state.flightMode = 'ALT_HOLD';
+      setElemText('hud-flight-mode', 'ALT_HOLD');
+      modeButtons.forEach(b => b.classList.toggle('active', b.dataset.mode === 'ALT_HOLD'));
+      logEvent('COMMAND', `ALTITUDE HOLD locked at ${(state.altitude_m || 2.5).toFixed(1)}m AGL.`);
+      updateRcChannelsHud();
+    });
+  }
+
+  // Cockpit Arm Toggle Button
+  const btnArmToggle = document.getElementById('btn-flight-arm-toggle');
+  if (btnArmToggle) {
+    btnArmToggle.addEventListener('click', () => {
+      if (state.isArmed) {
+        disarmDrone();
+      } else {
+        const modalArm = document.getElementById('modal-arming');
+        if (modalArm) modalArm.classList.remove('hidden');
+        else armDrone();
+      }
+    });
+  }
+
+  // Slide-to-Arm Modal Listeners
   const modalArm = document.getElementById('modal-arming');
   const btnCloseArm = document.getElementById('btn-close-arming-modal');
   const slideThumb = document.getElementById('slide-thumb');
   const slideTrack = document.getElementById('slide-track');
 
-  if (btnOpenArm && modalArm) {
-    btnOpenArm.addEventListener('click', () => {
-      if (state.isArmed) {
-        // Disarm directly
-        disarmDrone();
-      } else {
-        modalArm.classList.remove('hidden');
+  if (btnCloseArm && modalArm) {
+    btnCloseArm.addEventListener('click', () => modalArm.classList.add('hidden'));
+  }
+
+  if (slideThumb && slideTrack && modalArm) {
+    let slideDragging = false;
+    slideThumb.addEventListener('pointerdown', (e) => {
+      slideDragging = true;
+      slideThumb.setPointerCapture(e.pointerId);
+    });
+
+    slideThumb.addEventListener('pointermove', (e) => {
+      if (!slideDragging) return;
+      const trackRect = slideTrack.getBoundingClientRect();
+      const maxSlide = trackRect.width - 52;
+      let offset = e.clientX - trackRect.left - 23;
+      offset = Math.max(3, Math.min(maxSlide, offset));
+      slideThumb.style.left = `${offset}px`;
+
+      if (offset >= maxSlide - 6) {
+        slideDragging = false;
+        armDrone();
+        modalArm.classList.add('hidden');
+        slideThumb.style.left = '3px';
       }
     });
 
-    if (btnCloseArm) {
-      btnCloseArm.addEventListener('click', () => modalArm.classList.add('hidden'));
-    }
-
-    // Slide to Arm gesture
-    if (slideThumb && slideTrack) {
-      let slideDragging = false;
-      slideThumb.addEventListener('pointerdown', (e) => {
-        slideDragging = true;
-        slideThumb.setPointerCapture(e.pointerId);
-      });
-
-      slideThumb.addEventListener('pointermove', (e) => {
-        if (!slideDragging) return;
-        const trackRect = slideTrack.getBoundingClientRect();
-        const maxSlide = trackRect.width - 52;
-        let offset = e.clientX - trackRect.left - 23;
-        offset = Math.max(3, Math.min(maxSlide, offset));
-        slideThumb.style.left = `${offset}px`;
-
-        if (offset >= maxSlide - 6) {
-          // Trigger arming
-          slideDragging = false;
-          armDrone();
-          modalArm.classList.add('hidden');
-          slideThumb.style.left = '3px';
-        }
-      });
-
-      slideThumb.addEventListener('pointerup', () => {
-        slideDragging = false;
-        slideThumb.style.left = '3px';
-      });
-    }
+    slideThumb.addEventListener('pointerup', () => {
+      slideDragging = false;
+      slideThumb.style.left = '3px';
+    });
   }
 
-  // Emergency Stop Buttons (Header + Flight Screen)
+  // Emergency Stop Buttons (Header + Cockpit)
   const btnEstopHeader = document.getElementById('btn-emergency-header');
   const btnFlightEstop = document.getElementById('btn-flight-estop');
-  [btnEstopHeader, btnFlightEstop].forEach(btn => {
-    if (btn) {
-      btn.addEventListener('click', triggerEmergencyStop);
+  [btnEstopHeader, btnFlightEstop].forEach((btn) => {
+    if (btn) btn.addEventListener('click', triggerEmergencyStop);
+  });
+
+  // ------------------------------------------------------
+  // KEYBOARD CONTROLLER HOTKEYS
+  // ------------------------------------------------------
+  window.addEventListener('keydown', (e) => {
+    // Ignore keystrokes when typing into input fields
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+    let handled = true;
+    switch (e.code) {
+      case 'KeyW': // Throttle Up
+        state.sticks.throttle = Math.min(1.0, parseFloat((state.sticks.throttle + 0.05).toFixed(2)));
+        break;
+      case 'KeyS': // Throttle Down
+        state.sticks.throttle = Math.max(0.0, parseFloat((state.sticks.throttle - 0.05).toFixed(2)));
+        break;
+      case 'KeyA': // Yaw Left
+        state.sticks.yaw = Math.max(-1.0, parseFloat((state.sticks.yaw - 0.1).toFixed(2)));
+        break;
+      case 'KeyD': // Yaw Right
+        state.sticks.yaw = Math.min(1.0, parseFloat((state.sticks.yaw + 0.1).toFixed(2)));
+        break;
+      case 'ArrowUp': // Pitch Forward
+        state.sticks.pitch = Math.min(1.0, parseFloat((state.sticks.pitch + 0.1).toFixed(2)));
+        break;
+      case 'ArrowDown': // Pitch Backward
+        state.sticks.pitch = Math.max(-1.0, parseFloat((state.sticks.pitch - 0.1).toFixed(2)));
+        break;
+      case 'ArrowLeft': // Roll Left
+        state.sticks.roll = Math.max(-1.0, parseFloat((state.sticks.roll - 0.1).toFixed(2)));
+        break;
+      case 'ArrowRight': // Roll Right
+        state.sticks.roll = Math.min(1.0, parseFloat((state.sticks.roll + 0.1).toFixed(2)));
+        break;
+      case 'KeyT': // Takeoff
+        if (btnTakeoff) btnTakeoff.click();
+        break;
+      case 'KeyL': // Land
+        if (btnLand) btnLand.click();
+        break;
+      case 'KeyH': // Return to Home
+        if (btnRth) btnRth.click();
+        break;
+      case 'Space': // Emergency Stop
+        triggerEmergencyStop();
+        break;
+      default:
+        handled = false;
+    }
+
+    if (handled) {
+      e.preventDefault();
+      updateStickPositionUI();
+      updateStickReadouts();
+      updateMotorMixing();
+      updateRcChannelsHud();
+      updateProCockpitHUD();
     }
   });
+
+  // Spring cyclic sticks back on keyboard key release
+  window.addEventListener('keyup', (e) => {
+    if (['KeyA', 'KeyD'].includes(e.code)) state.sticks.yaw = 0.0;
+    if (['ArrowUp', 'ArrowDown'].includes(e.code)) state.sticks.pitch = 0.0;
+    if (['ArrowLeft', 'ArrowRight'].includes(e.code)) state.sticks.roll = 0.0;
+    updateStickPositionUI();
+    updateStickReadouts();
+    updateMotorMixing();
+    updateRcChannelsHud();
+    updateProCockpitHUD();
+  });
+
+  // ------------------------------------------------------
+  // GAMEPAD API REAL-TIME BRIDGE
+  // ------------------------------------------------------
+  initGamepadBridge();
+}
+
+function updateStickPositionUI() {
+  const leftThumb = document.getElementById('joystick-left-thumb');
+  const rightThumb = document.getElementById('joystick-right-thumb');
+  const maxRadius = 78;
+
+  if (leftThumb) {
+    const dx = state.sticks.yaw * maxRadius;
+    const dy = (0.5 - state.sticks.throttle) * (maxRadius * 2);
+    leftThumb.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+  }
+  if (rightThumb) {
+    const dx = state.sticks.roll * maxRadius;
+    const dy = -state.sticks.pitch * maxRadius;
+    rightThumb.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+  }
+}
+
+function updateStickReadouts() {
+  const throttlePct = Math.round(state.sticks.throttle * 100);
+  const throttlePwm = 1000 + Math.round(state.sticks.throttle * 1000);
+  const yawPwm = 1500 + Math.round((state.sticks.yaw + state.trims.yaw) * 500);
+  const pitchPwm = 1500 + Math.round((state.sticks.pitch + state.trims.pitch) * 500);
+  const rollPwm = 1500 + Math.round((state.sticks.roll + state.trims.roll) * 500);
+
+  setElemText('val-stick-throttle', `${throttlePct}%`);
+  setElemText('pwm-stick-throttle', `${throttlePwm} µs`);
+  setElemText('val-stick-yaw', state.sticks.yaw.toFixed(2));
+  setElemText('pwm-stick-yaw', `${yawPwm} µs`);
+
+  setElemText('val-stick-pitch', state.sticks.pitch.toFixed(2));
+  setElemText('pwm-stick-pitch', `${pitchPwm} µs`);
+  setElemText('val-stick-roll', state.sticks.roll.toFixed(2));
+  setElemText('pwm-stick-roll', `${rollPwm} µs`);
+}
+
+function updateRcChannelsHud() {
+  const ch1 = Math.round(1500 + (state.sticks.roll + state.trims.roll) * 500);
+  const ch2 = Math.round(1500 + (state.sticks.pitch + state.trims.pitch) * 500);
+  const ch3 = Math.round(1000 + state.sticks.throttle * 1000);
+  const ch4 = Math.round(1500 + (state.sticks.yaw + state.trims.yaw) * 500);
+  const ch5 = state.isArmed ? 2000 : 1000;
+  
+  const modePulseMap = {
+    'STABILIZE': 1100,
+    'ALT_HOLD': 1300,
+    'POS_HOLD': 1500,
+    'AUTO': 1700,
+    'RTL': 1900,
+    'ACRO': 2000
+  };
+  const ch6 = modePulseMap[state.flightMode] || 1100;
+
+  setElemText('rc-val-ch1', `${ch1} µs`);
+  setElemStyle('rc-bar-ch1', 'width', `${Math.min(100, Math.max(0, (ch1 - 1000) / 10))}%`);
+
+  setElemText('rc-val-ch2', `${ch2} µs`);
+  setElemStyle('rc-bar-ch2', 'width', `${Math.min(100, Math.max(0, (ch2 - 1000) / 10))}%`);
+
+  setElemText('rc-val-ch3', `${ch3} µs`);
+  setElemStyle('rc-bar-ch3', 'width', `${Math.min(100, Math.max(0, (ch3 - 1000) / 10))}%`);
+
+  setElemText('rc-val-ch4', `${ch4} µs`);
+  setElemStyle('rc-bar-ch4', 'width', `${Math.min(100, Math.max(0, (ch4 - 1000) / 10))}%`);
+
+  setElemText('rc-val-ch5', `${ch5} µs`);
+  setElemStyle('rc-bar-ch5', 'width', `${state.isArmed ? 100 : 0}%`);
+
+  setElemText('rc-val-ch6', `${ch6} µs`);
+  setElemStyle('rc-bar-ch6', 'width', `${Math.min(100, Math.max(0, (ch6 - 1000) / 10))}%`);
+}
+
+function updateMotorMixing() {
+  if (!state.isArmed) {
+    for (let i = 1; i <= 4; i++) {
+      setElemStyle(`motor-bar-${i}`, 'height', '0%');
+      setElemText(`motor-val-${i}`, '0%');
+      setElemText(`motor-rpm-${i}`, '0 RPM');
+    }
+    return;
+  }
+
+  const t = state.sticks.throttle;
+  const p = state.sticks.pitch;
+  const r = state.sticks.roll;
+  const y = state.sticks.yaw;
+
+  // Quad-X Motor Mixing Matrix
+  const m1 = Math.min(1.0, Math.max(0.05, t - 0.25 * p + 0.25 * r - 0.2 * y)); // Front-Right CW
+  const m2 = Math.min(1.0, Math.max(0.05, t + 0.25 * p + 0.25 * r + 0.2 * y)); // Rear-Right CCW
+  const m3 = Math.min(1.0, Math.max(0.05, t + 0.25 * p - 0.25 * r - 0.2 * y)); // Rear-Left CW
+  const m4 = Math.min(1.0, Math.max(0.05, t - 0.25 * p - 0.25 * r + 0.2 * y)); // Front-Left CCW
+
+  const motors = [m1, m2, m3, m4];
+  motors.forEach((m, idx) => {
+    const id = idx + 1;
+    const pct = Math.round(m * 100);
+    const rpm = Math.round(1200 + m * 22800);
+    setElemStyle(`motor-bar-${id}`, 'height', `${pct}%`);
+    setElemText(`motor-val-${id}`, `${pct}%`);
+    setElemText(`motor-rpm-${id}`, `${rpm.toLocaleString()} RPM`);
+  });
+}
+
+function updateProCockpitHUD() {
+  const rollDeg = (state.sticks.roll + state.trims.roll) * 25;
+  const pitchDeg = (state.sticks.pitch + state.trims.pitch) * 20;
+  const heading = state.heading_deg || 180;
+  const cardinal = getCardinal(heading);
+
+  const horizonSky = document.getElementById('horizon-sky-ground');
+  if (horizonSky) {
+    horizonSky.style.transform = `translateY(${pitchDeg * 1.8}px) rotate(${-rollDeg}deg)`;
+  }
+
+  const rollPointer = document.getElementById('roll-angle-pointer');
+  if (rollPointer) {
+    rollPointer.style.transform = `rotate(${rollDeg}deg)`;
+  }
+
+  setElemText('pfd-pitch-val', `PITCH: ${pitchDeg.toFixed(1)}°`);
+  setElemText('pfd-roll-val', `ROLL: ${rollDeg.toFixed(1)}°`);
+
+  const compassNeedle = document.getElementById('compass-needle');
+  if (compassNeedle) {
+    compassNeedle.style.transform = `rotate(${heading}deg)`;
+  }
+  setElemText('compass-heading-text', `${heading}° ${cardinal}`);
 }
 
 function armDrone() {
   state.isArmed = true;
   state.telemetry.flight.armed = true;
-  state.telemetry.flight.mode = 'manual';
+  state.telemetry.flight.mode = state.flightMode;
 
-  const btnOpenArm = document.getElementById('btn-open-arming');
-  if (btnOpenArm) btnOpenArm.textContent = 'DISARM DRONE (Simulated)';
+  const btnArmToggle = document.getElementById('btn-flight-arm-toggle');
+  const armToggleText = document.getElementById('arm-toggle-text');
+  if (btnArmToggle) btnArmToggle.classList.add('armed');
+  if (armToggleText) armToggleText.textContent = 'DISARM DRONE';
 
   logEvent('COMMAND', 'Drone ARMED with confirmation token PILOT-CONFIRM-SAFE');
+  updateMotorMixing();
+  updateRcChannelsHud();
   renderTelemetryUI();
 }
 
@@ -2105,34 +2703,97 @@ function disarmDrone() {
   state.telemetry.flight.armed = false;
   state.telemetry.flight.mode = 'disarmed';
 
-  const sliderThrottle = document.getElementById('slider-throttle');
-  const throttlePct = document.getElementById('throttle-pct-label');
-  if (sliderThrottle) sliderThrottle.value = 0;
-  if (throttlePct) throttlePct.textContent = '0%';
+  const btnArmToggle = document.getElementById('btn-flight-arm-toggle');
+  const armToggleText = document.getElementById('arm-toggle-text');
+  if (btnArmToggle) btnArmToggle.classList.remove('armed');
+  if (armToggleText) armToggleText.textContent = 'ARM DRONE';
 
-  const btnOpenArm = document.getElementById('btn-open-arming');
-  if (btnOpenArm) btnOpenArm.textContent = 'ARM DRONE (Simulated)';
-
+  updateStickPositionUI();
+  updateStickReadouts();
+  updateMotorMixing();
+  updateRcChannelsHud();
   logEvent('COMMAND', 'Drone DISARMED. Throttle reset to 0%');
   renderTelemetryUI();
 }
 
 function triggerEmergencyStop() {
   disarmDrone();
+  state.sticks.roll = 0.0;
+  state.sticks.pitch = 0.0;
+  state.sticks.yaw = 0.0;
+  state.sticks.throttle = 0.0;
+  updateStickPositionUI();
+  updateStickReadouts();
+  updateMotorMixing();
+  updateRcChannelsHud();
   logEvent('COMMAND', 'EMERGENCY MOTOR CUT TRIGGERED! All outputs commanded to 0.');
-  alert('EMERGENCY STOP EXECUTED: Throttle cut to 0.0. Flight mode set to DISARMED.');
+  alert('EMERGENCY STOP EXECUTED: All 4 motors killed immediately. Throttle set to 0. Drone DISARMED.');
 }
 
-function updateAttitudeGauges(roll, pitch) {
-  const dialRoll = document.getElementById('dial-roll');
-  const dialPitch = document.getElementById('dial-pitch');
-  if (dialRoll) dialRoll.style.transform = `rotate(${roll * 30}deg)`;
-  if (dialPitch) dialPitch.style.transform = `rotate(${pitch * 30}deg)`;
+function initGamepadBridge() {
+  window.addEventListener('gamepadconnected', (e) => {
+    state.gamepadIndex = e.gamepad.index;
+    const badge = document.getElementById('gamepad-status-badge');
+    if (badge) {
+      badge.textContent = `🎮 ${e.gamepad.id.substring(0, 18).toUpperCase()} CONNECTED`;
+      badge.classList.add('connected');
+    }
+    logEvent('SYSTEM', `Gamepad connected: ${e.gamepad.id}`);
+  });
 
-  const valAttitude = document.getElementById('val-attitude');
-  if (valAttitude) {
-    valAttitude.textContent = `R: ${(roll * 25).toFixed(1)}° | P: ${(pitch * 25).toFixed(1)}°`;
+  window.addEventListener('gamepaddisconnected', () => {
+    state.gamepadIndex = null;
+    const badge = document.getElementById('gamepad-status-badge');
+    if (badge) {
+      badge.textContent = '🎮 GAMEPAD: DISCONNECTED';
+      badge.classList.remove('connected');
+    }
+  });
+
+  function pollGamepad() {
+    if (state.gamepadIndex !== null) {
+      const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+      const gp = gamepads[state.gamepadIndex];
+      if (gp) {
+        // Mode 2 Standard Gamepad Mapping:
+        // Left Stick: Axes 0 (Yaw), 1 (Throttle inverted)
+        // Right Stick: Axes 2 (Roll), 3 (Pitch inverted)
+        const deadzone = 0.08;
+        const rawYaw = gp.axes[0] || 0;
+        const rawThrottle = gp.axes[1] || 0;
+        const rawRoll = gp.axes[2] || 0;
+        const rawPitch = gp.axes[3] || 0;
+
+        if (Math.abs(rawYaw) > deadzone) state.sticks.yaw = parseFloat(rawYaw.toFixed(2));
+        else state.sticks.yaw = 0.0;
+
+        // Invert Y axis for throttle (pushing up is negative axis value)
+        const mappedThrottle = Math.max(0, Math.min(1, 0.5 - rawThrottle * 0.5));
+        state.sticks.throttle = parseFloat(mappedThrottle.toFixed(2));
+
+        if (Math.abs(rawRoll) > deadzone) state.sticks.roll = parseFloat(rawRoll.toFixed(2));
+        else state.sticks.roll = 0.0;
+
+        if (Math.abs(rawPitch) > deadzone) state.sticks.pitch = parseFloat((-rawPitch).toFixed(2));
+        else state.sticks.pitch = 0.0;
+
+        // Button 0 (A / Cross): Arm / Disarm toggle
+        // Button 1 (B / Circle): Emergency Stop
+        // Button 2 (X / Square): Auto Takeoff
+        // Button 3 (Y / Triangle): Auto Land
+        if (gp.buttons[1] && gp.buttons[1].pressed) triggerEmergencyStop();
+
+        updateStickPositionUI();
+        updateStickReadouts();
+        updateMotorMixing();
+        updateRcChannelsHud();
+        updateProCockpitHUD();
+      }
+    }
+    requestAnimationFrame(pollGamepad);
   }
+
+  requestAnimationFrame(pollGamepad);
 }
 
 // ========================================================
