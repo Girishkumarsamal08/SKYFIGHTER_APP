@@ -497,10 +497,10 @@
 
           <!-- Live Video Viewport Container -->
           <div class="camera-canvas-container" id="camera-viewport-container-ai" style="background: #000; min-height: 520px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-subtle);">
-            <img id="drone-live-stream-img-ai" src="http://192.168.4.1/stream" style="width: 100%; height: 100%; max-height: 540px; object-fit: contain; border-radius: 8px; display: block;" alt="Live ESP32-CAM Feed" onerror="this.style.display='none'; document.getElementById('cam-fallback-box-ai').style.display='flex';">
+            <img id="drone-live-stream-img-ai" src="" style="width: 100%; height: 100%; max-height: 540px; object-fit: contain; border-radius: 8px; display: none;" alt="Live ESP32-CAM Feed" onerror="this.style.display='none'; document.getElementById('cam-fallback-box-ai').style.display='flex';">
             
             <!-- Fallback Standby Box if camera or backend is not reachable -->
-            <div id="cam-fallback-box-ai" style="display: none; flex-direction: column; align-items: center; justify-content: center; padding: 40px; text-align: center;">
+            <div id="cam-fallback-box-ai" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px; text-align: center;">
               <span style="font-size: 42px; margin-bottom: 12px;">📡</span>
               <h3 style="color: #00d4ff; margin-bottom: 8px; font-size: 18px;">ESP32-CAM Live Video Stream Standby</h3>
               <p style="color: #cbd5e1; max-width: 580px; font-size: 13px; line-height: 1.6; margin-bottom: 16px;">
@@ -740,8 +740,8 @@
           <div id="thermal-display-container" style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
             <!-- Left Viewport: Live Camera RGB Stream -->
             <div id="thermal-rgb-viewport" class="camera-canvas-container" style="background: #000; min-height: 380px; position: relative; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: center;">
-              <img id="thermal-rgb-img" src="http://192.168.4.1/stream" style="width: 100%; height: 100%; object-fit: contain;" alt="Live RGB Camera Feed" onerror="this.src=''; this.style.display='none'; document.getElementById('thermal-rgb-fallback').style.display='flex';">
-              <div id="thermal-rgb-fallback" style="display: none; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center;">
+              <img id="thermal-rgb-img" src="" style="width: 100%; height: 100%; object-fit: contain; display: none;" alt="Live RGB Camera Feed" onerror="this.src=''; this.style.display='none'; document.getElementById('thermal-rgb-fallback').style.display='flex';">
+              <div id="thermal-rgb-fallback" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center;">
                 <span style="font-size: 32px; margin-bottom: 8px;">📷</span>
                 <span style="color: #94a3b8; font-size: 13px;">ESP32-CAM RGB Video Standby</span>
                 <span style="color: #64748b; font-size: 11px; margin-top: 4px;">Connect Wi-Fi to FIRE-GUARDIAN-CAM</span>
