@@ -193,6 +193,11 @@ function bootApp() {
     console.error('[GCS] Serial init error:', e);
   }
   try {
+    initBackendServiceLink();
+  } catch (e) {
+    console.error('[GCS] Backend link error:', e);
+  }
+  try {
     initAutoConnect();
   } catch (e) {
     console.error('[GCS] Auto-connect error:', e);
@@ -3454,6 +3459,174 @@ function initAutoConnect() {
 
   // Initial attempt after brief startup
   setTimeout(tryAutoConnect, 800);
+}
+
+// ========================================================
+// FIRE GUARDIAN CENTRAL BACKEND TELEMETRY & MULTI-DEVICE CLIENT
+// ========================================================
+function updateDeviceTopologyUI(devices) {
+  if (!devices) return;
+  const devStatusBackend = document.getElementById('dev-status-backend');
+  const devStatusDevkit = document.getElementById('dev-status-devkit');
+  const devStatusS3 = document.getElementById('dev-status-s3');
+  const devStatusCam = document.getElementById('dev-status-cam');
+  const devStatusGateway = document.getElementById('dev-status-gateway');
+  const centralBadge = document.getElementById('central-conn-badge');
+  const centralText = document.getElementById('central-conn-text');
+
+  let onlineCount = 0;
+  const totalTracked = 5;
+
+  const updateCard = (el, cardId, isOnline) => {
+    if (!el) return;
+    el.textContent = isOnline ? 'ONLINE' : 'OFFLINE';
+    el.style.color = isOnline ? '#22c55e' : '#ef4444';
+    const card = document.getElementById(cardId);
+    if (card) {
+      card.style.borderColor = isOnline ? '#22c55e' : 'var(--border-subtle)';
+    }
+    if (isOnline) onlineCount++;
+  };
+
+  updateCard(devStatusBackend, 'dev-card-backend', devices.backend?.state === 'ONLINE');
+  updateCard(devStatusDevkit, 'dev-card-devkit', devices.esp32_devkit?.state === 'ONLINE');
+  updateCard(devStatusS3, 'dev-card-s3', devices.esp32_s3?.state === 'ONLINE');
+  updateCard(devStatusCam, 'dev-card-cam', devices.esp32_cam?.state === 'ONLINE');
+  updateCard(devStatusGateway, 'dev-card-gateway', devices.video_gateway?.state === 'ONLINE');
+
+  // Central Connection State:
+  // CONNECTED = all hardware online
+  // PARTIALLY CONNECTED = at least 1 online
+  // DISCONNECTED = 0 online
+  if (centralBadge && centralText) {
+    if (onlineCount === totalTracked) {
+      centralBadge.className = 'status-pill status-connected';
+      centralText.textContent = 'CONNECTED (ALL)';
+    } else if (onlineCount > 0) {
+      centralBadge.className = 'status-pill status-waiting';
+      centralText.textContent = `PARTIALLY CONNECTED (${onlineCount}/${totalTracked})`;
+    } else {
+      centralBadge.className = 'status-pill status-disconnected';
+      centralText.textContent = 'DISCONNECTED';
+    }
+  }
+
+  // Synchronize header conn-pill if connected via backend
+  const connPill = document.getElementById('conn-pill');
+  const connLabel = document.getElementById('conn-label');
+  if (connPill && connLabel && !state.isSimulation) {
+    if (onlineCount === totalTracked) {
+      connPill.className = 'status-pill status-connected';
+      connLabel.textContent = 'ALL BOARDS ONLINE';
+    } else if (onlineCount > 0) {
+      connPill.className = 'status-pill status-waiting';
+      connLabel.textContent = `PARTIAL LINK (${onlineCount}/${totalTracked})`;
+    } else if (!state.isConnected) {
+      connPill.className = 'status-pill status-disconnected';
+      connLabel.textContent = 'DRONE OFFLINE';
+    }
+  }
+}
+
+function applyBackendTelemetry(env, flight) {
+  if (env) {
+    state.isConnected = true;
+    state.telemetry.sensors.mq2_adc = env.smokeAdc;
+    state.telemetry.sensors.flame_detected = env.flameDetected;
+    state.telemetry.sensors.buzzer_active = env.buzzerActive;
+    state.telemetry.sensors.esp32_connected = true;
+    state.telemetry.sensors.last_update_ts = env.timestamp;
+
+    if (env.gpsFixed && env.latitude !== null && env.longitude !== null) {
+      state.telemetry.gps.valid = true;
+      state.telemetry.gps.latitude = env.latitude;
+      state.telemetry.gps.longitude = env.longitude;
+      state.telemetry.gps.satellites = env.satellites || 0;
+      state.telemetry.gps.altitude_m = env.altitudeM || null;
+    } else {
+      state.telemetry.gps.valid = false;
+      state.telemetry.gps.satellites = env.satellites || 0;
+    }
+  }
+
+  if (flight) {
+    state.telemetry.flight.armed = flight.armed;
+    state.telemetry.flight.mode = flight.flightMode;
+    state.isArmed = flight.armed;
+    state.flightMode = flight.flightMode;
+    if (flight.rollDeg !== null) state.sticks.roll = flight.rollDeg;
+    if (flight.pitchDeg !== null) state.sticks.pitch = flight.pitchDeg;
+    if (flight.yawDeg !== null) state.heading_deg = flight.yawDeg;
+    if (flight.altitudeM !== null) state.altitude_m = flight.altitudeM;
+    if (flight.verticalSpeedMps !== null) state.verticalSpeed_ms = flight.verticalSpeedMps;
+    if (flight.groundSpeedMps !== null) state.groundSpeed_kmh = flight.groundSpeedMps * 3.6;
+    if (flight.batteryVoltageV !== null) state.battery.voltage_v = flight.batteryVoltageV;
+  }
+
+  renderTelemetryUI();
+}
+
+function initBackendServiceLink() {
+  let backendUrl = localStorage.getItem('fireguardian_backend_url') || 'http://localhost:4000';
+  const inputUrl = document.getElementById('input-backend-service-url');
+  const btnSave = document.getElementById('btn-save-backend-url');
+  if (inputUrl) inputUrl.value = backendUrl;
+
+  if (btnSave && inputUrl) {
+    btnSave.addEventListener('click', () => {
+      backendUrl = inputUrl.value.trim().replace(/\/+$/, '');
+      localStorage.setItem('fireguardian_backend_url', backendUrl);
+      logEvent('SYSTEM', `FIRE GUARDIAN Backend Service URL updated: ${backendUrl}`);
+      pollBackend();
+    });
+  }
+
+  async function pollBackend() {
+    // Skip unencrypted HTTP calls when running on public HTTPS (unless user specifically configured localhost proxy)
+    if (window.location.protocol === 'https:' && backendUrl.startsWith('http://') && !backendUrl.includes('localhost')) {
+      return;
+    }
+
+    try {
+      const [devRes, telemRes, evtRes] = await Promise.all([
+        fetch(`${backendUrl}/api/devices/status`).then(r => r.json()).catch(() => null),
+        fetch(`${backendUrl}/api/telemetry/latest`).then(r => r.json()).catch(() => null),
+        fetch(`${backendUrl}/api/events?limit=20`).then(r => r.json()).catch(() => null)
+      ]);
+
+      if (devRes && devRes.devices) {
+        updateDeviceTopologyUI(devRes.devices);
+      }
+
+      if (telemRes && (telemRes.environment || telemRes.flight)) {
+        applyBackendTelemetry(telemRes.environment, telemRes.flight);
+      }
+
+      if (evtRes && evtRes.events && Array.isArray(evtRes.events)) {
+        evtRes.events.forEach(evt => {
+          if (!state.incidents.some(i => i.id === evt.id)) {
+            state.incidents.unshift({
+              id: evt.id,
+              type: evt.type,
+              level: evt.severity.toLowerCase(),
+              time: new Date(evt.timestamp).toLocaleTimeString(),
+              lat: evt.latitude || 0,
+              lon: evt.longitude || 0,
+              status: evt.acknowledged ? 'ACKNOWLEDGED' : 'ACTIVE',
+              desc: evt.message
+            });
+          }
+        });
+        syncAlertCenter();
+      }
+    } catch (e) {
+      // Offline fallback
+    }
+  }
+
+  // 1 Hz polling loop for live telemetry
+  setInterval(pollBackend, 1000);
+  setTimeout(pollBackend, 500);
 }
 
 // ========================================================

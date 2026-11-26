@@ -1,0 +1,245 @@
+/**
+ * ==============================================================================
+ * FIRE GUARDIAN — ESP32 DevKit V1 Environmental Monitoring Unit Firmware
+ * ==============================================================================
+ * Hardware:
+ *   - ESP32 DevKit V1
+ *   - MQ-2 Smoke / Combustible Gas Sensor on GPIO 34 (AO)
+ *   - Optical Flame Sensor on GPIO 27 (DO, Active-LOW)
+ *   - Emergency Buzzer on GPIO 25 (Active-HIGH)
+ *   - NEO-7M GPS on GPIO 16 (RX) / GPIO 17 (TX) at 9600 Baud
+ *   - 16x2 I2C LCD on GPIO 21 (SDA) / GPIO 22 (SCL)
+ *
+ * SAFETY MANDATE:
+ *   - The emergency buzzer and fire detection operate 100% locally and autonomously.
+ *   - Zero blocking delay() calls in the main control loop.
+ *   - If Wi-Fi, backend or internet is lost, the local buzzer and LCD continue to function.
+ * ==============================================================================
+ */
+
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <TinyGPSPlus.h>
+#include <ArduinoJson.h>
+#include "config.h"
+
+// ------------------------------------------------------------------------------
+// HARDWARE PERIPHERALS
+// ------------------------------------------------------------------------------
+LiquidCrystal_I2C lcd(0x27, 16, 2); // Default address 0x27 (or 0x3F)
+TinyGPSPlus gps;
+HardwareSerial GPSSerial(2); // UART2
+
+// ------------------------------------------------------------------------------
+// SENSOR & SYSTEM STATE
+// ------------------------------------------------------------------------------
+int rawSmokeAdc = 0;
+bool smokeDetected = false;
+bool flameDetected = false;
+bool buzzerActive = false;
+
+double latitude = 0.0;
+double longitude = 0.0;
+bool gpsFixed = false;
+int satelliteCount = 0;
+float altitudeM = 0.0;
+
+unsigned long lastTelemetryMs = 0;
+unsigned long lastLcdRefreshMs = 0;
+unsigned long lastWifiCheckMs = 0;
+bool lcdFound = false;
+
+// ------------------------------------------------------------------------------
+// AUTONOMOUS LOCAL SENSOR LOOP (ZERO BLOCKING DELAY)
+// ------------------------------------------------------------------------------
+void pollSensors() {
+  // Read MQ-2 Analog Smoke Sensor (12-bit ADC: 0 - 4095)
+  rawSmokeAdc = analogRead(PIN_MQ2_ANALOG);
+  smokeDetected = (rawSmokeAdc >= MQ2_THRESHOLD);
+
+  // Read Flame Sensor Digital Output (Active-LOW)
+  flameDetected = (digitalRead(PIN_FLAME_DIGITAL) == FLAME_ACTIVE_LEVEL);
+
+  // Autonomous Hardware Interlock: Sound emergency buzzer immediately on hazard
+  buzzerActive = (smokeDetected || flameDetected);
+  digitalWrite(PIN_BUZZER, buzzerActive ? HIGH : LOW);
+}
+
+// ------------------------------------------------------------------------------
+// GPS NMEA PARSER (STREAMED VIA UART2)
+// ------------------------------------------------------------------------------
+void processGPS() {
+  while (GPSSerial.available() > 0) {
+    char c = GPSSerial.read();
+    gps.encode(c);
+  }
+
+  if (gps.location.isValid() && gps.location.age() < 5000) {
+    latitude = gps.location.lat();
+    longitude = gps.location.lng();
+    gpsFixed = true;
+    satelliteCount = gps.satellites.isValid() ? gps.satellites.value() : 0;
+    altitudeM = gps.altitude.isValid() ? (float)gps.altitude.meters() : 0.0;
+  } else {
+    gpsFixed = false;
+    satelliteCount = gps.satellites.isValid() ? gps.satellites.value() : 0;
+  }
+}
+
+// ------------------------------------------------------------------------------
+// LOCAL 16x2 I2C LCD MONITOR
+// ------------------------------------------------------------------------------
+void updateLCD() {
+  if (!lcdFound) return;
+
+  lcd.setCursor(0, 0);
+  if (flameDetected) {
+    lcd.print("! FIRE DETECTED !");
+  } else if (smokeDetected) {
+    lcd.print("! SMOKE HAZARD ! ");
+  } else {
+    lcd.print("ENV: SAFE        ");
+  }
+
+  lcd.setCursor(0, 1);
+  lcd.printf("MQ:%4d GPS:%s", rawSmokeAdc, gpsFixed ? "FIX " : "WAIT");
+}
+
+// ------------------------------------------------------------------------------
+// TELEMETRY TRANSMISSION TO BACKEND VIA HTTP POST
+// ------------------------------------------------------------------------------
+void sendTelemetryToBackend() {
+  if (WiFi.status() != WL_CONNECTED) {
+    return; // Wi-Fi offline; local detection remains active
+  }
+
+  HTTPClient http;
+  http.begin(BACKEND_URL);
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("X-Device-Token", DEVICE_AUTH_TOKEN);
+  http.setTimeout(1200); // Strict timeout to prevent blocking main loop
+
+  StaticJsonDocument<512> doc;
+  doc["device_id"] = DEVICE_ID;
+  doc["smoke_adc"] = rawSmokeAdc;
+  doc["smoke_detected"] = smokeDetected;
+  doc["flame_detected"] = flameDetected;
+
+  if (gpsFixed) {
+    doc["latitude"] = latitude;
+    doc["longitude"] = longitude;
+    doc["gps_fixed"] = true;
+    doc["satellites"] = satelliteCount;
+    doc["altitude_m"] = altitudeM;
+  } else {
+    doc["latitude"] = nullptr;
+    doc["longitude"] = nullptr;
+    doc["gps_fixed"] = false;
+    doc["satellites"] = satelliteCount;
+    doc["altitude_m"] = nullptr;
+  }
+
+  doc["buzzer"] = buzzerActive;
+  doc["uptime"] = (uint32_t)(millis() / 1000);
+  doc["timestamp"] = (uint64_t)millis();
+
+  String payload;
+  serializeJson(doc, payload);
+
+  int httpCode = http.POST(payload);
+  if (httpCode > 0) {
+    // Successfully delivered telemetry
+  } else {
+    // Network retry will happen naturally on next cadence
+  }
+  http.end();
+}
+
+// ------------------------------------------------------------------------------
+// NON-BLOCKING WI-FI MANAGEMENT
+// ------------------------------------------------------------------------------
+void maintainWiFiConnection() {
+  if (WiFi.status() != WL_CONNECTED) {
+    unsigned long now = millis();
+    if (now - lastWifiCheckMs > 10000) { // Retry every 10 seconds
+      lastWifiCheckMs = now;
+      WiFi.reconnect();
+    }
+  }
+}
+
+// ------------------------------------------------------------------------------
+// SETUP
+// ------------------------------------------------------------------------------
+void setup() {
+  Serial.begin(115200);
+  delay(100);
+
+  Serial.println("\n========================================================");
+  Serial.println("  FIRE GUARDIAN — ESP32 DevKit V1 Environmental Unit   ");
+  Serial.println("========================================================");
+
+  // Configure GPIO Pins
+  pinMode(PIN_MQ2_ANALOG, INPUT);
+  pinMode(PIN_FLAME_DIGITAL, INPUT_PULLUP);
+  pinMode(PIN_BUZZER, OUTPUT);
+  digitalWrite(PIN_BUZZER, LOW);
+
+  // Initialize I2C and LCD
+  Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
+  Wire.beginTransmission(0x27);
+  if (Wire.endTransmission() == 0) {
+    lcdFound = true;
+    lcd.init();
+    lcd.backlight();
+    lcd.setCursor(0, 0);
+    lcd.print("FIRE GUARDIAN v1");
+    lcd.setCursor(0, 1);
+    lcd.print("Init Sensors...");
+  } else {
+    Serial.println("[LCD] I2C LCD not detected at 0x27. Continuing without display.");
+  }
+
+  // Initialize NEO-7M GPS UART
+  GPSSerial.begin(GPS_BAUD_RATE, SERIAL_8N1, PIN_GPS_RX, PIN_GPS_TX);
+  Serial.printf("[GPS] Initialized UART2 on RX:%d TX:%d at %d baud\n", PIN_GPS_RX, PIN_GPS_TX, GPS_BAUD_RATE);
+
+  // Initialize Wi-Fi in Station Mode (Non-blocking)
+  WiFi.mode(WIFI_STA);
+  WiFi.setAutoReconnect(true);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  Serial.printf("[WiFi] Connecting to %s...\n", WIFI_SSID);
+
+  // Initial sensor warm-up read
+  pollSensors();
+}
+
+// ------------------------------------------------------------------------------
+// MAIN CONTROL LOOP (NON-BLOCKING)
+// ------------------------------------------------------------------------------
+void loop() {
+  unsigned long now = millis();
+
+  // 1. Continuous, non-blocking sensor acquisition & emergency buzzer interlock
+  pollSensors();
+
+  // 2. Stream GPS NMEA characters from hardware UART buffer
+  processGPS();
+
+  // 3. Periodic 16x2 LCD refresh (every 500 ms)
+  if (now - lastLcdRefreshMs >= LCD_REFRESH_INTERVAL_MS) {
+    lastLcdRefreshMs = now;
+    updateLCD();
+  }
+
+  // 4. Periodic Telemetry Transmission to Backend (every 1000 ms)
+  if (now - lastTelemetryMs >= TELEMETRY_INTERVAL_MS) {
+    lastTelemetryMs = now;
+    sendTelemetryToBackend();
+  }
+
+  // 5. Non-blocking Wi-Fi auto-reconnect check
+  maintainWiFiConnection();
+}

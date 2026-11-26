@@ -1486,6 +1486,57 @@
                 <button id="btn-release-lease" class="btn-secondary">Release Control</button>
               </div>
             </div>
+
+            <!-- Central Hardware Topology & Multi-Device Health Panel -->
+            <div class="settings-panel" style="grid-column: span 2; margin-top: 16px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+                <div>
+                  <h3 style="margin: 0; font-size: 16px;">Hardware Topology &amp; Board Connection States</h3>
+                  <p class="panel-desc" style="margin: 4px 0 0 0; font-size: 12px;">Live connection states for individual drone boards and backend telemetry service.</p>
+                </div>
+                <div id="central-conn-badge" class="status-pill status-disconnected" style="font-size: 12px; padding: 4px 12px;">
+                  <span class="pill-dot"></span>
+                  <span id="central-conn-text">DISCONNECTED</span>
+                </div>
+              </div>
+
+              <!-- 5-Board Hardware Status Grid -->
+              <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 16px;">
+                <div class="device-card" id="dev-card-backend" style="background: #111a2c; border: 1px solid var(--border-subtle); border-radius: 6px; padding: 12px; text-align: center;">
+                  <div style="font-size: 22px; margin-bottom: 4px;">🖥️</div>
+                  <div style="font-size: 12px; font-weight: bold; color: #fff;">Backend API</div>
+                  <div id="dev-status-backend" style="font-size: 11px; font-weight: bold; color: #ef4444; margin-top: 4px;">OFFLINE</div>
+                </div>
+                <div class="device-card" id="dev-card-devkit" style="background: #111a2c; border: 1px solid var(--border-subtle); border-radius: 6px; padding: 12px; text-align: center;">
+                  <div style="font-size: 22px; margin-bottom: 4px;">🩺</div>
+                  <div style="font-size: 12px; font-weight: bold; color: #fff;">ESP32 DevKit</div>
+                  <div id="dev-status-devkit" style="font-size: 11px; font-weight: bold; color: #ef4444; margin-top: 4px;">OFFLINE</div>
+                </div>
+                <div class="device-card" id="dev-card-s3" style="background: #111a2c; border: 1px solid var(--border-subtle); border-radius: 6px; padding: 12px; text-align: center;">
+                  <div style="font-size: 22px; margin-bottom: 4px;">🕹️</div>
+                  <div style="font-size: 12px; font-weight: bold; color: #fff;">ESP32-S3 (FC)</div>
+                  <div id="dev-status-s3" style="font-size: 11px; font-weight: bold; color: #ef4444; margin-top: 4px;">OFFLINE</div>
+                </div>
+                <div class="device-card" id="dev-card-cam" style="background: #111a2c; border: 1px solid var(--border-subtle); border-radius: 6px; padding: 12px; text-align: center;">
+                  <div style="font-size: 22px; margin-bottom: 4px;">📷</div>
+                  <div style="font-size: 12px; font-weight: bold; color: #fff;">ESP32-CAM</div>
+                  <div id="dev-status-cam" style="font-size: 11px; font-weight: bold; color: #ef4444; margin-top: 4px;">OFFLINE</div>
+                </div>
+                <div class="device-card" id="dev-card-gateway" style="background: #111a2c; border: 1px solid var(--border-subtle); border-radius: 6px; padding: 12px; text-align: center;">
+                  <div style="font-size: 22px; margin-bottom: 4px;">🌐</div>
+                  <div style="font-size: 12px; font-weight: bold; color: #fff;">Video Gateway</div>
+                  <div id="dev-status-gateway" style="font-size: 11px; font-weight: bold; color: #ef4444; margin-top: 4px;">OFFLINE</div>
+                </div>
+              </div>
+
+              <div class="form-row" style="align-items: center; gap: 12px; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 6px;">
+                <div class="form-group" style="flex: 1; margin: 0;">
+                  <label style="font-size: 12px;">FIRE GUARDIAN Backend Service URL:</label>
+                  <input type="text" id="input-backend-service-url" value="http://localhost:4000" class="tactical-input" style="font-family: monospace; font-size: 12px;">
+                </div>
+                <button id="btn-save-backend-url" class="btn-primary" style="margin-top: 18px; padding: 8px 18px; font-size: 12px;">Connect to Backend</button>
+              </div>
+            </div>
           </div>
         </section>
 
