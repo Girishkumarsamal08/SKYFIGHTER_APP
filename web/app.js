@@ -2623,6 +2623,40 @@ function initSimulatedCanvases() {
         console.log('[DroneVision] Vision service offline. Standby mode active.');
       });
   }, 1000);
+
+  // Auto-engage live stream whenever Video Gateway (:4050) detects ESP32-CAM on FIRE-GUARDIAN-CAM Wi-Fi
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'http:') {
+    const checkCameraLive = () => {
+      fetch('http://localhost:4050/api/camera/status')
+        .then(r => r.json())
+        .then(data => {
+          if (data && data.camera && data.camera.online && !isStreamRunning) {
+            console.log('[AutoStream] Video Gateway (:4050) detected ESP32-CAM online. Engaging stream automatically...');
+            const streamImg = document.getElementById('drone-live-stream-img-ai');
+            const fallback = document.getElementById('cam-fallback-box-ai');
+            const thermalRgb = document.getElementById('thermal-rgb-img');
+            const thermalFb = document.getElementById('thermal-rgb-fallback');
+            const streamSrc = `http://localhost:4050/api/video/stream?t=${Date.now()}`;
+
+            if (streamImg) {
+              streamImg.src = streamSrc;
+              streamImg.style.display = 'block';
+            }
+            if (thermalRgb) {
+              thermalRgb.src = streamSrc;
+              thermalRgb.style.display = 'block';
+            }
+            if (fallback) fallback.style.display = 'none';
+            if (thermalFb) thermalFb.style.display = 'none';
+            isStreamRunning = true;
+          }
+        })
+        .catch(() => {});
+    };
+
+    setInterval(checkCameraLive, 2500);
+    setTimeout(checkCameraLive, 1200);
+  }
 }
 
 // ========================================================
