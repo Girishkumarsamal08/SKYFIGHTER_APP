@@ -734,6 +734,9 @@ function updateWildlifeThreatTable(assessments, isModelConnected = true) {
 }
 
 function renderTelemetryUI() {
+  // Real ESP32 cloud data takes over unless demo mode or a direct drone link is active
+  if (!state.isSimulation && !state.isConnected && window.fireGuardianCloud?.render()) return;
+
   const t = state.telemetry;
   const s = t.sensors;
   const g = t.gps;

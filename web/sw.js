@@ -4,12 +4,13 @@
  * Non-HTTP and WebSocket traffic bypasses the cache.
  */
 
-const CACHE_NAME = 'skyfighter-v1.2.0';
+const CACHE_NAME = 'skyfighter-v1.3.0';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './style.css',
   './app.js',
+  './fireguard-cloud.js',
   './protocol.js',
   './manifest.webmanifest',
   './icons/icon-192.png',
