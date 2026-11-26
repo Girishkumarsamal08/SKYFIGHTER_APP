@@ -1788,6 +1788,9 @@ function initSimulatedCanvases() {
 
     try {
       const wsUrl = visionBackendUrl.replace(/^http/, 'ws') + '/ws/detections';
+      if (window.location.protocol === 'https:' && wsUrl.startsWith('ws://')) {
+        return; // Insecure WebSocket cannot be initiated from HTTPS origin
+      }
       visionWs = new WebSocket(wsUrl);
 
       visionWs.onopen = () => {
@@ -2599,8 +2602,12 @@ function initSimulatedCanvases() {
     });
   }
 
-  // Auto-connect to local vision service if available on page load
+  // Auto-connect to local vision service if available on page load (skipped on HTTPS if backend is unencrypted HTTP)
   setTimeout(() => {
+    if (window.location.protocol === 'https:' && visionBackendUrl.startsWith('http://')) {
+      console.log('[DroneVision] HTTPS cloud deployment: skipping background HTTP localhost probe to protect SSL context.');
+      return;
+    }
     fetch(`${visionBackendUrl}/api/camera/status`)
       .then(res => res.json())
       .then(() => {
@@ -3428,6 +3435,16 @@ function initAutoConnect() {
     // Only attempt if not already connected and not in demo simulation mode
     if (state.isConnected || state.isSimulation) return;
     const url = inputUrl ? inputUrl.value.trim() : 'ws://192.168.4.1:8080/telemetry';
+
+    // On HTTPS, do not auto-poll insecure ws:// because browsers strictly block mixed-content WebSockets
+    if (window.location.protocol === 'https:' && url.startsWith('ws://')) {
+      const wsStatus = document.getElementById('ws-status-msg');
+      if (wsStatus && !state.isConnected) {
+        wsStatus.innerHTML = '🔒 <strong>Cloud HTTPS Mode</strong>: Standby. For direct ESP32 hardware telemetry, run locally (<code>localhost</code>) or install the Desktop App.';
+      }
+      return;
+    }
+
     connectWebSocket(url);
   }
 
