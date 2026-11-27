@@ -1,4 +1,4 @@
-// FIRE GUARDIAN: receives ESP32 readings (POST) and serves them to the website (GET).
+// FIRE GUARDIAN: receives ESP32 readings & AI vision events (POST) and serves them to the website (GET).
 // Storage: Upstash Redis over REST (no npm packages needed).
 const crypto = require('crypto');
 
@@ -6,9 +6,11 @@ const DEVICE = 'FIRE-GUARDIAN-DRONE';
 const OFFLINE_MS = 15000;      // no data for this long = device offline
 const GAP_MS = 60000;          // a longer silence ends the previous alert
 const MAX_ALERTS = 50;
+const MAX_ANIMALS = 50;
 
-const K_STATE = 'fireguard:state';    // latest reading, last GPS fix, open alert
-const K_ALERTS = 'fireguard:alerts';  // finished alerts, newest first
+const K_STATE = 'fireguard:state';      // latest reading, last GPS fix, open alert
+const K_ALERTS = 'fireguard:alerts';    // finished alerts, newest first
+const K_ANIMALS = 'fireguard:animals';  // animal detection history, newest first
 
 async function redis(commands) {
   const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
@@ -41,7 +43,11 @@ function validate(d) {
   for (const f of ['flame', 'smoke', 'danger', 'gpsValid']) {
     if (typeof d[f] !== 'boolean') return `${f} must be true or false`;
   }
-  if (d.danger !== (d.flame || d.smoke)) return 'danger does not match flame/smoke';
+  const aiFire = Boolean(d.aiFire);
+  const aiSmoke = Boolean(d.aiSmoke);
+  const expectedDanger = Boolean(d.flame || d.smoke || aiFire || aiSmoke);
+  if (d.danger !== expectedDanger) return 'danger does not match flame/smoke/ai sources';
+
   if (!Number.isInteger(d.smokeValue) || d.smokeValue < 0 || d.smokeValue > 4095) {
     return 'smokeValue must be an integer from 0 to 4095';
   }
@@ -50,18 +56,35 @@ function validate(d) {
     const okLng = Number.isFinite(d.longitude) && Math.abs(d.longitude) <= 180;
     if (!okLat || !okLng) return 'Invalid GPS coordinates';
   }
+
+  // Sanitize optional animal detections
+  let animalDetections = [];
+  if (Array.isArray(d.aiDetections)) {
+    animalDetections = d.aiDetections.slice(0, 10).map((a) => ({
+      species: typeof a.species === 'string' ? a.species.slice(0, 50) : 'Animal',
+      confidence: Number.isFinite(a.confidence) ? Math.min(100, Math.max(0, Math.round(a.confidence))) : 0,
+      threatCategory: typeof a.threatCategory === 'string' ? a.threatCategory : 'LOW',
+      threatReason: typeof a.threatReason === 'string' ? a.threatReason : 'Routine observation',
+      action: typeof a.action === 'string' ? a.action : 'Monitor from distance',
+      bbox: Array.isArray(a.bbox) ? a.bbox.slice(0, 4) : [],
+    }));
+  }
+
   return {
     flame: d.flame,
     smoke: d.smoke,
+    aiFire: aiFire,
+    aiSmoke: aiSmoke,
     danger: d.danger,
     smokeValue: d.smokeValue,
     gpsValid: d.gpsValid,
     latitude: d.gpsValid ? d.latitude : null,
     longitude: d.gpsValid ? d.longitude : null,
+    animalDetections: animalDetections,
   };
 }
 
-// One alert is opened when danger starts and closed when it ends.
+// Consolidates physical and AI detection sources into active and historic alerts.
 function update(prev, reading, now) {
   let active = prev.active || null;
   const finished = [];
@@ -81,9 +104,30 @@ function update(prev, reading, now) {
     : prev.lastFix || null;
 
   if (reading.danger) {
-    if (!active) active = { id: `A-${now}`, startedAt: now, flame: false, smoke: false, location: null };
+    if (!active) {
+      active = {
+        id: `A-${now}`,
+        startedAt: now,
+        flame: false,
+        smoke: false,
+        aiFire: false,
+        aiSmoke: false,
+        sources: [],
+        location: null,
+      };
+    }
     active.flame = active.flame || reading.flame;
     active.smoke = active.smoke || reading.smoke;
+    active.aiFire = active.aiFire || reading.aiFire;
+    active.aiSmoke = active.aiSmoke || reading.aiSmoke;
+
+    const sourcesSet = new Set(active.sources || []);
+    if (reading.flame) sourcesSet.add('PHYSICAL_FLAME');
+    if (reading.smoke) sourcesSet.add('PHYSICAL_SMOKE');
+    if (reading.aiFire) sourcesSet.add('AI_VISION_FIRE');
+    if (reading.aiSmoke) sourcesSet.add('AI_VISION_SMOKE');
+    active.sources = Array.from(sourcesSet);
+
     if (reading.gpsValid) active.location = lastFix;
   }
 
@@ -94,9 +138,10 @@ module.exports = async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   try {
     if (req.method === 'GET') {
-      const [raw, list] = await redis([
+      const [raw, list, animals] = await redis([
         ['GET', K_STATE],
         ['LRANGE', K_ALERTS, 0, 19],
+        ['LRANGE', K_ANIMALS, 0, 29],
       ]);
       const s = raw ? JSON.parse(raw) : {};
       const age = s.latest ? Date.now() - s.latest.receivedAt : null;
@@ -107,6 +152,7 @@ module.exports = async function handler(req, res) {
         lastFix: s.lastFix || null,
         activeAlert: s.active || null,
         history: (list || []).map((x) => JSON.parse(x)),
+        animalHistory: (animals || []).map((x) => JSON.parse(x)),
       });
     }
 
@@ -124,10 +170,33 @@ module.exports = async function handler(req, res) {
       if (typeof reading === 'string') return res.status(400).json({ error: reading });
 
       const [raw] = await redis([['GET', K_STATE]]);
-      const { state, finished } = update(raw ? JSON.parse(raw) : {}, reading, Date.now());
+      const now = Date.now();
+      const { state, finished } = update(raw ? JSON.parse(raw) : {}, reading, now);
       const commands = [['SET', K_STATE, JSON.stringify(state)]];
       for (const a of finished) commands.push(['LPUSH', K_ALERTS, JSON.stringify(a)]);
       if (finished.length) commands.push(['LTRIM', K_ALERTS, 0, MAX_ALERTS - 1]);
+
+      // Push any animal detections to K_ANIMALS
+      if (reading.animalDetections && reading.animalDetections.length > 0) {
+        for (const animal of reading.animalDetections) {
+          const entry = {
+            id: `ANM-${now}-${Math.random().toString(36).slice(2, 6)}`,
+            timestamp: now,
+            species: animal.species,
+            confidence: animal.confidence,
+            threatCategory: animal.threatCategory,
+            threatReason: animal.threatReason,
+            action: animal.action,
+            bbox: animal.bbox,
+            latitude: reading.gpsValid ? reading.latitude : (state.lastFix ? state.lastFix.latitude : null),
+            longitude: reading.gpsValid ? reading.longitude : (state.lastFix ? state.lastFix.longitude : null),
+            gpsValid: reading.gpsValid,
+          };
+          commands.push(['LPUSH', K_ANIMALS, JSON.stringify(entry)]);
+        }
+        commands.push(['LTRIM', K_ANIMALS, 0, MAX_ANIMALS - 1]);
+      }
+
       await redis(commands);
       return res.status(200).json({ ok: true });
     }

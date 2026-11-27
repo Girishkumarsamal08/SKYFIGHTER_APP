@@ -2068,12 +2068,17 @@ function initSimulatedCanvases() {
           data.events.forEach(ev => {
             const sevClass = ev.alert_severity === 'CRITICAL' ? 'badge-critical' : 'badge-severity';
             const sevStyle = ev.alert_severity === 'CRITICAL' ? 'background:#ef4444;color:#fff;' : 'background:#22c55e;color:#000;';
+            const coordsText = (ev.gps_valid && Number.isFinite(ev.latitude) && Number.isFinite(ev.longitude))
+              ? `<a href="https://www.google.com/maps?q=${ev.latitude},${ev.longitude}" target="_blank" rel="noopener noreferrer" style="color:#00d4ff;text-decoration:none;font-weight:bold;">📍 ${ev.latitude.toFixed(6)}, ${ev.longitude.toFixed(6)}</a>`
+              : `<span style="color:#8a96aa;font-size:10px;">GPS SIGNAL NOT AVAILABLE</span>`;
+            const speciesText = ev.species || ev.class_name;
             html += `<tr>
               <td style="font-family:monospace;color:#00d4ff;">#${ev.id}</td>
               <td style="font-family:monospace;font-size:11px;">${ev.timestamp}</td>
-              <td><b>${ev.class_name}</b></td>
+              <td><b>${speciesText}</b></td>
               <td><span style="color:#8a96aa;">${ev.category}</span></td>
               <td style="font-family:monospace;color:#22c55e;">${ev.confidence}%</td>
+              <td>${coordsText}</td>
               <td><span class="${sevClass}" style="${sevStyle}padding:2px 6px;border-radius:4px;font-size:10px;font-weight:bold;">${ev.alert_severity}</span></td>
               <td><span style="color:#22c55e;font-size:11px;">VERIFIED</span></td>
             </tr>`;
