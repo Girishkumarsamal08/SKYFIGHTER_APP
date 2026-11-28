@@ -97,8 +97,6 @@ const state = {
       buzzer_active: false,
       mpu_connected: false,
       mpu_temperature_c: null,
-      lcd_line1: 'FG: SENSORS OK',
-      lcd_line2: 'SMK:SAFE FLM:NO',
       esp32_connected: false,
       last_update_ts: null
     },
@@ -862,9 +860,6 @@ function renderTelemetryUI() {
     setElemStyle('status-gps-diag-badge', 'background', 'rgba(239,68,68,0.2)');
     setElemStyle('status-gps-diag-badge', 'color', '#ef4444');
 
-    setElemText('lcd-line-1', 'FG: OFFLINE     ');
-    setElemText('lcd-line-2', 'AWAITING LINK...');
-
     setElemText('esp32-hw-conn-badge', 'ESP32: DISCONNECTED');
     setElemStyle('esp32-hw-conn-badge', 'background', 'rgba(239,68,68,0.2)');
     setElemStyle('esp32-hw-conn-badge', 'color', '#ef4444');
@@ -1102,15 +1097,37 @@ function renderTelemetryUI() {
       gpsPill.className = 'status-pill status-armed';
       gpsLabel.textContent = `GPS: 3D FIX (${g.satellites || 9})`;
     }
+  } else {
+    setElemText('val-coords', 'GPS SIGNAL NOT AVAILABLE');
+    setElemText('sub-gps', 'Awaiting NEO-7M satellite lock');
+    setElemText('diag-gps-lat', '--');
+    setElemText('diag-gps-lon', '--');
+    setElemText('diag-gps-sat-count', `${g && g.satellites ? g.satellites : 0} Locked`);
+    setElemText('diag-gps-fix-type', 'GPS SIGNAL NOT AVAILABLE');
+    const badgeGpsDiag = document.getElementById('status-gps-diag-badge');
+    if (badgeGpsDiag) {
+      badgeGpsDiag.textContent = 'NO FIX';
+      badgeGpsDiag.style.background = 'rgba(239,68,68,0.2)';
+      badgeGpsDiag.style.color = '#ef4444';
+    }
+    setElemText('map-lat', '--');
+    setElemText('map-lon', '--');
+    setElemText('map-alt', '--');
+    setElemText('map-sats', 'No Fix');
+    setElemText('map-drone-pos', 'DRONE: GPS SIGNAL NOT AVAILABLE');
+    if (gpsPill && gpsLabel) {
+      gpsPill.className = 'status-pill status-disconnected';
+      gpsLabel.textContent = 'GPS: NO FIX';
+    }
   }
 
-  // 5. Local LCD (GPIO 21, 22)
-  const lcd1 = document.getElementById('lcd-line-1');
-  const lcd2 = document.getElementById('lcd-line-2');
-  const l1 = flameDetected ? 'FG: FIRE ALERT! ' : (mq2Val >= warnThresh ? 'FG: SMOKE WARN! ' : 'FG: SENSORS OK  ');
-  const l2 = `SMK:${mq2Val || 0} FLM:${flameDetected ? 'YES' : 'NO'}`.padEnd(16, ' ');
-  if (lcd1) lcd1.textContent = l1;
-  if (lcd2) lcd2.textContent = l2;
+  // 5. Autonomous Safety Interlock
+  const safetyBadge = document.getElementById('status-safety-badge');
+  if (safetyBadge) {
+    safetyBadge.textContent = (flameDetected || (mq2Val >= warnThresh)) ? 'TRIGGERED' : 'MONITORING';
+    safetyBadge.style.background = (flameDetected || (mq2Val >= warnThresh)) ? '#ef4444' : '#22c55e';
+    safetyBadge.style.color = (flameDetected || (mq2Val >= warnThresh)) ? '#fff' : '#000';
+  }
 
   // 6. ESP32 DevKit Link Health
   const nowTimeStr = new Date().toLocaleTimeString();

@@ -31,8 +31,6 @@
 #define PIN_BUZZER          25   // Emergency acoustic alarm (Active HIGH)
 #define PIN_GPS_RX          16   // ESP32 RX2 <- GPS TX
 #define PIN_GPS_TX          17   // ESP32 TX2 -> GPS RX
-#define PIN_I2C_SDA         21   // I2C Data for 16x2 LCD
-#define PIN_I2C_SCL         22   // I2C Clock for 16x2 LCD
 
 // ==============================================================================
 // SENSOR THRESHOLDS & TIMINGS
@@ -42,6 +40,5 @@
 #define GPS_BAUD_RATE       9600   // NEO-7M default NMEA baud rate
 
 #define TELEMETRY_INTERVAL_MS 1000 // Send telemetry to backend at 1 Hz
-#define LCD_REFRESH_INTERVAL_MS 500 // Refresh local 16x2 LCD at 2 Hz
 
 #endif // FIRE_GUARDIAN_CONFIG_H

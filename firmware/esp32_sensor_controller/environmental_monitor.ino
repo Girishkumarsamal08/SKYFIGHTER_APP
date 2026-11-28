@@ -2,25 +2,22 @@
  * ==============================================================================
  * FIRE GUARDIAN — ESP32 DevKit V1 Environmental Monitoring Unit Firmware
  * ==============================================================================
- * Hardware:
+ * Hardware Peripherals:
  *   - ESP32 DevKit V1
  *   - MQ-2 Smoke / Combustible Gas Sensor on GPIO 34 (AO)
  *   - Optical Flame Sensor on GPIO 27 (DO, Active-LOW)
- *   - Emergency Buzzer on GPIO 25 (Active-HIGH)
+ *   - Emergency Buzzer Siren on GPIO 25 (Active-HIGH)
  *   - NEO-7M GPS on GPIO 16 (RX) / GPIO 17 (TX) at 9600 Baud
- *   - 16x2 I2C LCD on GPIO 21 (SDA) / GPIO 22 (SCL)
  *
  * SAFETY MANDATE:
  *   - The emergency buzzer and fire detection operate 100% locally and autonomously.
  *   - Zero blocking delay() calls in the main control loop.
- *   - If Wi-Fi, backend or internet is lost, the local buzzer and LCD continue to function.
+ *   - If Wi-Fi, backend, or internet is lost, the local buzzer continues to function.
  * ==============================================================================
  */
 
 #include <WiFi.h>
 #include <HTTPClient.h>
-#include <Wire.h>
-#include <LiquidCrystal_I2C.h>
 #include <TinyGPSPlus.h>
 #include <ArduinoJson.h>
 #include "config.h"
@@ -28,7 +25,6 @@
 // ------------------------------------------------------------------------------
 // HARDWARE PERIPHERALS
 // ------------------------------------------------------------------------------
-LiquidCrystal_I2C lcd(0x27, 16, 2); // Default address 0x27 (or 0x3F)
 TinyGPSPlus gps;
 HardwareSerial GPSSerial(2); // UART2
 
@@ -47,9 +43,7 @@ int satelliteCount = 0;
 float altitudeM = 0.0;
 
 unsigned long lastTelemetryMs = 0;
-unsigned long lastLcdRefreshMs = 0;
 unsigned long lastWifiCheckMs = 0;
-bool lcdFound = false;
 
 // ------------------------------------------------------------------------------
 // AUTONOMOUS LOCAL SENSOR LOOP (ZERO BLOCKING DELAY)
@@ -59,7 +53,7 @@ void pollSensors() {
   rawSmokeAdc = analogRead(PIN_MQ2_ANALOG);
   smokeDetected = (rawSmokeAdc >= MQ2_THRESHOLD);
 
-  // Read Flame Sensor Digital Output (Active-LOW)
+  // Read Flame Sensor Digital Output (Active-LOW: 0V = Flame detected)
   flameDetected = (digitalRead(PIN_FLAME_DIGITAL) == FLAME_ACTIVE_LEVEL);
 
   // Autonomous Hardware Interlock: Sound emergency buzzer immediately on hazard
@@ -86,25 +80,6 @@ void processGPS() {
     gpsFixed = false;
     satelliteCount = gps.satellites.isValid() ? gps.satellites.value() : 0;
   }
-}
-
-// ------------------------------------------------------------------------------
-// LOCAL 16x2 I2C LCD MONITOR
-// ------------------------------------------------------------------------------
-void updateLCD() {
-  if (!lcdFound) return;
-
-  lcd.setCursor(0, 0);
-  if (flameDetected) {
-    lcd.print("! FIRE DETECTED !");
-  } else if (smokeDetected) {
-    lcd.print("! SMOKE HAZARD ! ");
-  } else {
-    lcd.print("ENV: SAFE        ");
-  }
-
-  lcd.setCursor(0, 1);
-  lcd.printf("MQ:%4d GPS:%s", rawSmokeAdc, gpsFixed ? "FIX " : "WAIT");
 }
 
 // ------------------------------------------------------------------------------
@@ -151,8 +126,6 @@ void sendTelemetryToBackend() {
   int httpCode = http.POST(payload);
   if (httpCode > 0) {
     // Successfully delivered telemetry
-  } else {
-    // Network retry will happen naturally on next cadence
   }
   http.end();
 }
@@ -187,21 +160,6 @@ void setup() {
   pinMode(PIN_BUZZER, OUTPUT);
   digitalWrite(PIN_BUZZER, LOW);
 
-  // Initialize I2C and LCD
-  Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
-  Wire.beginTransmission(0x27);
-  if (Wire.endTransmission() == 0) {
-    lcdFound = true;
-    lcd.init();
-    lcd.backlight();
-    lcd.setCursor(0, 0);
-    lcd.print("FIRE GUARDIAN v1");
-    lcd.setCursor(0, 1);
-    lcd.print("Init Sensors...");
-  } else {
-    Serial.println("[LCD] I2C LCD not detected at 0x27. Continuing without display.");
-  }
-
   // Initialize NEO-7M GPS UART
   GPSSerial.begin(GPS_BAUD_RATE, SERIAL_8N1, PIN_GPS_RX, PIN_GPS_TX);
   Serial.printf("[GPS] Initialized UART2 on RX:%d TX:%d at %d baud\n", PIN_GPS_RX, PIN_GPS_TX, GPS_BAUD_RATE);
@@ -212,7 +170,7 @@ void setup() {
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   Serial.printf("[WiFi] Connecting to %s...\n", WIFI_SSID);
 
-  // Initial sensor warm-up read
+  // Initial sensor read
   pollSensors();
 }
 
@@ -228,18 +186,12 @@ void loop() {
   // 2. Stream GPS NMEA characters from hardware UART buffer
   processGPS();
 
-  // 3. Periodic 16x2 LCD refresh (every 500 ms)
-  if (now - lastLcdRefreshMs >= LCD_REFRESH_INTERVAL_MS) {
-    lastLcdRefreshMs = now;
-    updateLCD();
-  }
-
-  // 4. Periodic Telemetry Transmission to Backend (every 1000 ms)
+  // 3. Periodic Telemetry Transmission to Backend (every 1000 ms)
   if (now - lastTelemetryMs >= TELEMETRY_INTERVAL_MS) {
     lastTelemetryMs = now;
     sendTelemetryToBackend();
   }
 
-  // 5. Non-blocking Wi-Fi auto-reconnect check
+  // 4. Non-blocking Wi-Fi auto-reconnect check
   maintainWiFiConnection();
 }

@@ -185,8 +185,6 @@
     text('diag-esp-link-state', online ? 'CONNECTED' : 'DISCONNECTED');
     text('diag-sensor-last-ts', updated);
     text('diag-telemetry-status', online ? 'Receiving telemetry' : 'No recent packets');
-    text('lcd-line-1', r.danger ? '! FIRE DETECTED !' : 'FG: SENSORS OK  ');
-    text('lcd-line-2', `MQ:${r.smokeValue} GPS:${fix ? 'FIX ' : 'WAIT'}`);
 
     // Update Animal Detections Table
     renderAnimalHistory();
